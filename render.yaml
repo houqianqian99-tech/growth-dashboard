@@ -4,12 +4,14 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: node render-server.mjs
     healthCheckPath: /health
     envVars:
       - key: FEISHU_APP_ID
-        sync: false
+        value: cli_aa1aa97db7f9dbb3
       - key: FEISHU_APP_SECRET
-        sync: false
+        value: uhnwcRjbLQGGmys4Ge29gcHwvgPqTxkY
       - key: FEISHU_BOT_OPEN_ID
-        sync: false
+        value: ou_5d50cdb150703d7ebc194a26517734bb
+      - key: FEISHU_CHAT_ID
+        value: oc_9cd0f1c77455f2c60e192e3c1f0abe0e
