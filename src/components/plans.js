@@ -53,7 +53,38 @@ export function renderPlans(data, update) {
 function monthlyPane(data, update) {
   const m = data.plans.monthly;
   const card = el('div', 'card');
-  card.appendChild(h('h3', '', '月度计划'));
+  const title = h('h3', '');
+  title.appendChild(h('span', '', '月度计划'));
+  const genBtn = el('button', 'btn-quick', '从年度目标自动生成');
+  genBtn.addEventListener('click', () => {
+    const goals = data.annualGoals || [];
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const phaseGoals = goals.filter(g => {
+      const p = g.phase || 1;
+      if (month <= 4) return p === 1;
+      if (month <= 8) return p <= 2;
+      if (month <= 10) return p <= 3;
+      return true;
+    });
+    const p0 = phaseGoals.filter(g => g.priority === 'P0').map(g => g.name);
+    const p1 = phaseGoals.filter(g => g.priority === 'P1').map(g => g.name);
+    m.top3 = [p0[0] || p1[0] || '', p0[1] || p1[1] || '', p0[2] || p1[2] || ''].filter(Boolean);
+    const dims = ['A', 'B', 'C', 'D', 'E'];
+    dims.forEach((d, i) => {
+      const dimGoals = goals.filter(g => g.category === d);
+      if (m.goals && m.goals[i]) {
+        m.goals[i].target = dimGoals.map(g => g.name).join('、') || '';
+        m.goals[i].metric = dimGoals.map(g => `${g.name}${g.progress}%`).join('；') || '';
+      }
+    });
+    const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+    m.theme = `${monthNames[month - 1]}：${p0.concat(p1).slice(0, 3).join(' + ')} 重点突破`;
+    toast('月计划已从年度目标自动生成', 'success');
+    update();
+  });
+  title.appendChild(genBtn);
+  card.appendChild(title);
 
   const themeBox = el('div');
   themeBox.style.cssText = 'margin-bottom:14px;';
@@ -132,7 +163,39 @@ function monthlyPane(data, update) {
 function weeklyPane(data, update) {
   const w = data.plans.weekly;
   const card = el('div', 'card');
-  card.appendChild(h('h3', '', '周计划'));
+  const title = h('h3', '');
+  title.appendChild(h('span', '', '周计划'));
+  const genBtn = el('button', 'btn-quick', '从月计划自动生成');
+  genBtn.addEventListener('click', () => {
+    const m = data.plans.monthly;
+    w.theme = m.theme ? `本周：${m.top3 ? m.top3[0] : ''} 专项推进` : '本周：按月计划推进';
+    const dims = ['A', 'B', 'C', 'D', 'E'];
+    const dayFocus = [
+      { day: '周一', dim: 'A', text: '会计精学' },
+      { day: '周二', dim: 'A', text: '英语精读' },
+      { day: '周三', dim: 'B', text: '内容创作' },
+      { day: '周四', dim: 'A', text: '会计+写作' },
+      { day: '周五', dim: 'D', text: '读书+练字' },
+      { day: '周六', dim: 'B', text: '视频/播客录制' },
+      { day: '周日', dim: 'E', text: '周复盘+休整' }
+    ];
+    if (w.schedule) {
+      dayFocus.forEach((d, i) => {
+        if (w.schedule[i]) {
+          w.schedule[i].focus = d.text;
+        }
+      });
+    }
+    if (w.mustDo) {
+      const top3 = m.top3 || [];
+      w.mustDo = top3.slice(0, 3).map((t, i) => ({ id: `w${i+1}`, text: t, done: false }));
+      while (w.mustDo.length < 3) w.mustDo.push({ id: `w${w.mustDo.length+1}`, text: '', done: false });
+    }
+    toast('周计划已从月计划自动生成', 'success');
+    update();
+  });
+  title.appendChild(genBtn);
+  card.appendChild(title);
 
   const themeBox = el('div');
   themeBox.style.cssText = 'margin-bottom:14px;';

@@ -1,4 +1,4 @@
-import { daysUntil, getWeekday } from '../utils/helpers.js';
+import { getWeekday } from '../utils/helpers.js';
 
 const NAV_GROUPS = [
   { title: '总控', items: [{ id: 'p1', icon: '📊', label: '仪表盘' }] },
@@ -21,6 +21,39 @@ const NAV_GROUPS = [
   { title: '设置', items: [
     { id: 'p11', icon: '⚙️', label: '系统设置' }
   ]}
+];
+
+const QUOTES = [
+  '日拱一卒，功不唐捐',
+  '今日事今日毕',
+  '种一棵树最好的时间是十年前，其次是现在',
+  '不积跬步无以至千里',
+  '自律给我自由',
+  '每天进步一点点',
+  '行动是治愈焦虑的良药',
+  '把简单的事做到极致',
+  '光想不做，一切都是零',
+  '复盘是为了更好地前进',
+  '坚持比天赋更重要',
+  '完成比完美更重要',
+  '小步快跑，迭代优化',
+  '今天的努力是明天的底气',
+  '可控的事尽力，不可控的事释然',
+  '与其焦虑不如行动',
+  '习惯成自然，自然成命运',
+  '每天前进一小步，人生前进一大步',
+  '把时间花在进步上，而不是焦虑上',
+  '今天的你比昨天的你更好就够了',
+  '做难事必有所得',
+  '执行力是拉开差距的关键',
+  '先完成再完美',
+  '慢慢来，比较快',
+  '保持节奏感比冲刺更重要',
+  '一个人走得快，一群人走得远',
+  '可以慢但不能停',
+  '方向对了就不怕路远',
+  '把每一天当作第一天来过',
+  '持续做正确的事，时间会给你答案'
 ];
 
 export function renderSidebar(activePage, navigate) {
@@ -59,21 +92,18 @@ export function renderTopbar(data) {
   const day = now.getDate();
   const weekday = '星期' + getWeekday(now);
 
-  let countdownsHtml = '';
-  const goals = (data.annualGoals || []).filter(g => g.priority === 'P0').slice(0, 3);
-  goals.forEach(g => {
-    const targetDate = g.deadline || g.targetDate || g.endDate;
-    if (!targetDate) {
-      countdownsHtml += `<div class="cd"><span>${g.name}</span><strong>无截止日</strong></div>`;
-      return;
-    }
-    const days = daysUntil(targetDate);
-    const warnClass = days < 30 ? ' warn' : '';
-    countdownsHtml += `<div class="cd${warnClass}"><span>${g.name}</span><strong>${days}天</strong></div>`;
-  });
+  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  const quote = QUOTES[dayOfYear % QUOTES.length];
 
-  if (goals.length === 0) {
-    countdownsHtml = '<div class="cd"><span>暂无P0目标</span><strong>-</strong></div>';
+  const dailyTodos = (data.plans && data.plans.daily) || [];
+  const incomplete = dailyTodos.filter(t => !t.done);
+  const top3 = incomplete.slice(0, 3);
+
+  let rightHtml = '';
+  if (top3.length) {
+    rightHtml = top3.map(t => `<div class="cd"><span>${t.timeBlock || ''} ${t.text}</span><strong class="urgent-tag">待办</strong></div>`).join('');
+  } else {
+    rightHtml = `<div class="cd quote"><span>${quote}</span></div>`;
   }
 
   return `
@@ -82,7 +112,7 @@ export function renderTopbar(data) {
       <span class="status-badge"><span class="dot-live"></span>自动化运行中</span>
     </div>
     <div class="countdowns">
-      ${countdownsHtml}
+      ${rightHtml}
     </div>
   `;
 }
