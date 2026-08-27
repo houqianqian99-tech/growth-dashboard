@@ -96,22 +96,14 @@ function monthlyPane(data, update) {
       toast('请先填写本月主题或 Top 3 目标', 'error');
       return;
     }
-    const goalsByName = {};
-    goals.forEach(g => { goalsByName[g.name] = g; });
-    const allKeywords = [];
-    if (top3Text) allKeywords.push(...m.top3.filter(Boolean));
     const dims = ['A', 'B', 'C', 'D', 'E'];
     dims.forEach((d, i) => {
       const dimGoals = goals.filter(g => g.category === d);
       const matched = [];
-      const unmatched = [];
       m.top3.forEach(t => {
         if (!t) return;
         const found = goals.find(g => g.name === t || t.includes(g.name) || g.name.includes(t));
         if (found && found.category === d) matched.push(found);
-        else if (dimGoals.length) {
-          unmatched.push(t);
-        }
       });
       const autoFill = matched.length ? matched : dimGoals.slice(0, 2);
       if (m.goals && m.goals[i]) {
@@ -219,24 +211,26 @@ function weeklyPane(data, update) {
   genBtn.addEventListener('click', () => {
     const m = data.plans.monthly;
     w.theme = m.theme ? `本周：${m.top3 ? m.top3[0] : ''} 专项推进` : '本周：按月计划推进';
-    const dayFocus = [
-      { day: '周一', text: '会计精学' },
-      { day: '周二', text: '英语精读' },
-      { day: '周三', text: '内容创作' },
-      { day: '周四', text: '会计+写作' },
-      { day: '周五', text: '读书+练字' },
-      { day: '周六', text: '视频/播客录制' },
-      { day: '周日', text: '周复盘+休整' }
-    ];
+    const dayFocus = {
+      '周一': { A: '会计精学', B: '', C: '', D: '', E: '' },
+      '周二': { A: '英语精读', B: '', C: '', D: '', E: '' },
+      '周三': { A: '', B: '内容创作', C: '', D: '', E: '' },
+      '周四': { A: '会计+写作', B: '', C: '', D: '', E: '' },
+      '周五': { A: '', B: '', C: '', D: '读书+练字', E: '' },
+      '周六': { A: '', B: '视频/播客录制', C: '', D: '', E: '' },
+      '周日': { A: '', B: '', C: '', D: '', E: '周复盘+休整' }
+    };
     if (w.schedule) {
-      dayFocus.forEach((d, i) => {
-        if (w.schedule[i]) w.schedule[i].focus = d.text;
+      Object.keys(dayFocus).forEach(day => {
+        if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
+        Object.keys(dayFocus[day]).forEach(dim => {
+          w.schedule[day][dim] = dayFocus[day][dim];
+        });
       });
     }
     if (w.mustDo) {
-      const top3 = m.top3 || [];
-      w.mustDo = top3.slice(0, 3).map((t, i) => ({ id: `w${i+1}`, text: t, done: false }));
-      while (w.mustDo.length < 3) w.mustDo.push({ id: `w${w.mustDo.length+1}`, text: '', done: false });
+      const top3 = (m.top3 || []).filter(Boolean);
+      w.mustDo = [top3[0] || '', top3[1] || '', top3[2] || ''];
     }
     toast('周计划已从月计划自动生成', 'success');
     update();
@@ -252,29 +246,41 @@ function weeklyPane(data, update) {
       return;
     }
     const keywords = themeText.replace(/本周[：:]/, '').split(/[，,、+]/).map(s => s.trim()).filter(Boolean);
-    const dayFocus = [
-      '周一', '周二', '周三', '周四', '周五', '周六', '周日'
-    ];
-    const defaultSchedule = [
-      '会计精学', '英语精读', '内容创作', '会计+写作', '读书+练字', '视频/播客录制', '周复盘+休整'
-    ];
+    const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const dimMap = {
+      '会计': 'A', '英语': 'A', '雅思': 'A', '学': 'A', '写作': 'A', 'PS': 'A', '剪辑': 'A',
+      '小红书': 'B', '抖音': 'B', '哔哩': 'B', '视频': 'B', '播客': 'B', '内容': 'B', '运营': 'B',
+      '健身': 'C', '运动': 'C', '作息': 'C', '外卖': 'C',
+      '读书': 'D', '阅读': 'D', '观影': 'D', '书': 'D',
+      '复盘': 'E', '计划': 'E', '整理': 'E'
+    };
     if (w.schedule) {
-      dayFocus.forEach((d, i) => {
-        if (w.schedule[i]) {
-          if (i < keywords.length) {
-            w.schedule[i].focus = keywords[i % keywords.length];
-          } else {
-            w.schedule[i].focus = defaultSchedule[i] || '机动';
-          }
-        }
+      dayNames.forEach(day => {
+        if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
+        ['A', 'B', 'C', 'D', 'E'].forEach(d => { w.schedule[day][d] = ''; });
       });
+      if (keywords.length === 0) {
+        w.schedule['周一']['A'] = '会计精学';
+        w.schedule['周二']['A'] = '英语精读';
+        w.schedule['周三']['B'] = '内容创作';
+        w.schedule['周四']['A'] = '会计+写作';
+        w.schedule['周五']['D'] = '读书+练字';
+        w.schedule['周六']['B'] = '视频/播客录制';
+        w.schedule['周日']['E'] = '周复盘+休整';
+      } else {
+        dayNames.forEach((day, i) => {
+          const kw = keywords[i % keywords.length];
+          let dim = 'A';
+          for (const [key, d] of Object.entries(dimMap)) {
+            if (kw.includes(key)) { dim = d; break; }
+          }
+          w.schedule[day][dim] = kw;
+        });
+        if (!w.schedule['周日']['E']) w.schedule['周日']['E'] = '周复盘+休整';
+      }
     }
     if (w.mustDo) {
-      const top3 = keywords.slice(0, 3);
-      w.mustDo = top3.map((t, i) => ({ id: `w${i+1}`, text: t, done: false }));
-      while (w.mustDo.length < 3) {
-        w.mustDo.push({ id: `w${w.mustDo.length + 1}`, text: '', done: false });
-      }
+      w.mustDo = [keywords[0] || '', keywords[1] || '', keywords[2] || ''];
     }
     toast('已根据手写主题分解每日安排和 Must-Do', 'success');
     update();
@@ -336,7 +342,8 @@ function weeklyPane(data, update) {
   mustBox.style.cssText = 'margin-bottom:14px;';
   mustBox.appendChild(planLabel('本周 Must-Do'));
   (w.mustDo || []).forEach((val, i) => {
-    const inp = planInput(val, `Must-Do ${i + 1}`);
+    const v = typeof val === 'string' ? val : (val && val.text) || '';
+    const inp = planInput(v, `Must-Do ${i + 1}`);
     inp.style.marginBottom = '6px';
     inp.addEventListener('input', () => { w.mustDo[i] = inp.value; });
     mustBox.appendChild(inp);
