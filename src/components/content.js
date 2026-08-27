@@ -3,6 +3,14 @@ import { PLATFORMS, SUGGESTIONS } from '../utils/frameworks.js';
 
 const PLAT_KEYS = ['xiaohongshu', 'douyin', 'bilibili', 'podcast'];
 
+const STAGES = [
+  { key: 'idea', label: '构思', icon: '💡', color: '#6366f1' },
+  { key: 'script', label: '写稿', icon: '✍️', color: '#f59e0b' },
+  { key: 'record', label: '录制/拍摄', icon: '🎬', color: '#ef4444' },
+  { key: 'edit', label: '后期', icon: '🎞️', color: '#8b5cf6' },
+  { key: 'publish', label: '发布', icon: '🚀', color: '#10b981' }
+];
+
 const BOOKMARKLET = `javascript:(function(){var tables=document.querySelectorAll('table');if(!tables.length){alert('未找到表格数据');return;}var csv='';tables[0].querySelectorAll('tr').forEach(function(tr){var row=[];tr.querySelectorAll('th,td').forEach(function(cell){row.push(cell.innerText.trim())});csv+=row.join(',')+'\\n'});navigator.clipboard.writeText(csv).then(function(){alert('数据已复制到剪贴板！回到工作台粘贴')})})();`;
 
 export function renderContent(data, update) {
@@ -24,6 +32,8 @@ export function renderContent(data, update) {
 
   const detailHost = el('div');
   root.appendChild(detailHost);
+
+  root.appendChild(buildCreationPipeline(data, update));
 
   const wizardCard = el('div', 'card');
   wizardCard.appendChild(h('h3', '', '半自动数据采集'));
@@ -297,6 +307,195 @@ export function renderContent(data, update) {
   renderWizard();
 
   return root;
+}
+
+function buildCreationPipeline(data, update) {
+  if (!data.content.creations) data.content.creations = [];
+  const creations = data.content.creations;
+
+  const card = el('div', 'card');
+  const head = h('h3', '', '内容创作工作流');
+  const addBtn = el('button', 'btn btn-sm', '+ 新建内容');
+  addBtn.addEventListener('click', () => openCreationModal(data, null, update));
+  head.appendChild(addBtn);
+  card.appendChild(head);
+
+  const desc = h('div', 'muted', '管理每期内容的创作流程：构思 → 写稿 → 录制/拍摄 → 后期 → 发布。支持飞书文档链接导入稿件。');
+  desc.style.marginBottom = '12px';
+  card.appendChild(desc);
+
+  if (!creations.length) {
+    const hint = el('div', 'empty-hint');
+    hint.appendChild(h('div', 'hint-icon', '🎬'));
+    hint.appendChild(h('div', '', '还没有创作内容，点击「新建内容」开始'));
+    card.appendChild(hint);
+    return card;
+  }
+
+  const cols = el('div');
+  cols.style.display = 'flex';
+  cols.style.gap = '12px';
+  cols.style.overflowX = 'auto';
+  cols.style.paddingBottom = '8px';
+
+  STAGES.forEach(stage => {
+    const col = el('div');
+    col.style.minWidth = '200px';
+    col.style.flex = '1';
+    const colHead = el('div');
+    colHead.style.display = 'flex';
+    colHead.style.alignItems = 'center';
+    colHead.style.gap = '6px';
+    colHead.style.marginBottom = '8px';
+    colHead.style.padding = '6px 8px';
+    colHead.style.borderRadius = '6px';
+    colHead.style.background = stage.color + '15';
+    colHead.appendChild(h('span', '', stage.icon));
+    colHead.appendChild(h('span', '', stage.label));
+    const count = creations.filter(c => (c.stage || 'idea') === stage.key).length;
+    colHead.appendChild(h('span', '', `(${count})`));
+    col.appendChild(colHead);
+
+    const items = creations.filter(c => (c.stage || 'idea') === stage.key);
+    if (!items.length) {
+      const empty = h('div', 'muted', '—');
+      empty.style.textAlign = 'center';
+      empty.style.padding = '12px 0';
+      col.appendChild(empty);
+    } else {
+      items.forEach(item => {
+        const itemCard = buildCreationCard(item, data, update);
+        col.appendChild(itemCard);
+      });
+    }
+    cols.appendChild(col);
+  });
+
+  card.appendChild(cols);
+  return card;
+}
+
+function buildCreationCard(item, data, update) {
+  const plat = PLATFORMS[item.platform] || { icon: '📝', name: '未分类' };
+  const card = el('div');
+  card.style.border = '1px solid var(--border)';
+  card.style.borderRadius = '8px';
+  card.style.padding = '8px';
+  card.style.marginBottom = '8px';
+  card.style.cursor = 'pointer';
+  card.style.background = 'var(--surface)';
+
+  card.addEventListener('click', () => openCreationModal(data, item, update));
+
+  card.appendChild(h('div', '', `${plat.icon} ${item.title || '无标题'}`));
+  if (item.feishuDocUrl) {
+    const link = h('div', '', '📄 飞书稿件');
+    link.style.fontSize = '11px';
+    link.style.color = 'var(--accent)';
+    card.appendChild(link);
+  }
+  if (item.script) {
+    const preview = h('div', 'muted', item.script.substring(0, 50) + (item.script.length > 50 ? '...' : ''));
+    preview.style.fontSize = '11px';
+    preview.style.marginTop = '4px';
+    card.appendChild(preview);
+  }
+  return card;
+}
+
+function openCreationModal(data, existing, update) {
+  if (!data.content.creations) data.content.creations = [];
+  const isEdit = !!existing;
+  const item = existing || {
+    id: uid('creation'),
+    title: '',
+    platform: 'podcast',
+    stage: 'idea',
+    feishuDocUrl: '',
+    feishuDocTitle: '',
+    script: '',
+    recordNotes: '',
+    publishDate: '',
+    createdAt: todayStr()
+  };
+
+  const stageOptions = STAGES.map(s => `<option value="${s.key}" ${item.stage === s.key ? 'selected' : ''}>${s.icon} ${s.label}</option>`).join('');
+  const platOptions = PLAT_KEYS.map(k => `<option value="${k}" ${item.platform === k ? 'selected' : ''}>${PLATFORMS[k].icon} ${PLATFORMS[k].name}</option>`).join('');
+
+  const modalHtml = `
+    <div class="modal" style="max-width:640px">
+      <h3>${isEdit ? '编辑内容' : '新建内容'}</h3>
+      <div class="form-row">
+        <label>标题 *</label>
+        <input type="text" id="cr-title" value="${item.title || ''}" placeholder="如：第3期播客-会计备考经验分享" />
+      </div>
+      <div class="form-row" style="display:flex;gap:12px">
+        <div style="flex:1">
+          <label>平台</label>
+          <select id="cr-platform">${platOptions}</select>
+        </div>
+        <div style="flex:1">
+          <label>当前阶段</label>
+          <select id="cr-stage">${stageOptions}</select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>飞书文档链接</label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="cr-feishu-url" value="${item.feishuDocUrl || ''}" placeholder="粘贴飞书文档链接" style="flex:1" />
+          <input type="text" id="cr-feishu-title" value="${item.feishuDocTitle || ''}" placeholder="文档标题" style="flex:1" />
+        </div>
+        ${item.feishuDocUrl ? `<a href="${item.feishuDocUrl}" target="_blank" rel="noopener" class="btn btn-secondary" style="margin-top:6px;display:inline-block;font-size:12px">📄 在飞书打开</a>` : ''}
+      </div>
+      <div class="form-row">
+        <label>稿件内容（可直接在此写稿）</label>
+        <textarea id="cr-script" placeholder="在此输入稿件内容，或在飞书写完稿后粘贴链接" style="height:200px;font-size:13px;line-height:1.6">${item.script || ''}</textarea>
+      </div>
+      <div class="form-row">
+        <label>录制/拍摄笔记</label>
+        <textarea id="cr-notes" placeholder="录制时的备注、修改、注意事项" style="height:60px">${item.recordNotes || ''}</textarea>
+      </div>
+      <div class="form-row">
+        <label>计划发布日期</label>
+        <input type="date" id="cr-publish-date" value="${item.publishDate || ''}" />
+      </div>
+      <div class="modal-actions">
+        ${isEdit ? '<button class="btn-secondary" id="cr-delete" style="float:left;color:#ef4444">删除</button>' : ''}
+        <button class="btn-secondary" data-close>取消</button>
+        <button class="btn" id="cr-save">保存</button>
+      </div>
+    </div>
+  `;
+  const overlay = openModal(modalHtml, (ov) => {
+    ov.querySelector('#cr-save').addEventListener('click', () => {
+      const title = ov.querySelector('#cr-title').value.trim();
+      if (!title) { toast('请输入标题', 'error'); return; }
+      item.title = title;
+      item.platform = ov.querySelector('#cr-platform').value;
+      item.stage = ov.querySelector('#cr-stage').value;
+      item.feishuDocUrl = ov.querySelector('#cr-feishu-url').value.trim();
+      item.feishuDocTitle = ov.querySelector('#cr-feishu-title').value.trim();
+      item.script = ov.querySelector('#cr-script').value;
+      item.recordNotes = ov.querySelector('#cr-notes').value.trim();
+      item.publishDate = ov.querySelector('#cr-publish-date').value;
+      item.updatedAt = todayStr();
+      if (!isEdit) data.content.creations.push(item);
+      toast(isEdit ? '内容已更新' : '内容已创建', 'success');
+      closeModal(overlay);
+      update();
+    });
+    if (isEdit) {
+      ov.querySelector('#cr-delete').addEventListener('click', () => {
+        const idx = data.content.creations.findIndex(c => c.id === item.id);
+        if (idx >= 0) {
+          data.content.creations.splice(idx, 1);
+          toast('内容已删除', 'success');
+          closeModal(overlay);
+          update();
+        }
+      });
+    }
+  });
 }
 
 function buildAISuggest() {

@@ -124,7 +124,8 @@ function getDefaultData() {
       xiaohongshu: { followers: 0, posts: [], importedData: null },
       douyin:      { followers: 0, posts: [], importedData: null },
       podcast:      { episodes: [], importedData: null },
-      bilibili:     { followers: 0, posts: [], importedData: null }
+      bilibili:     { followers: 0, posts: [], importedData: null },
+      creations: []
     },
     health: {
       weightLog: [],
