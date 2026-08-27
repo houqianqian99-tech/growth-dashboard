@@ -1,0 +1,4 @@
+node_modules/
+data.json
+.trae/
+.DS_Store

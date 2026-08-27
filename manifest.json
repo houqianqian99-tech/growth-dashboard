@@ -1,0 +1,11 @@
+{
+  "name": "个人成长管理工作台",
+  "short_name": "成长工作台",
+  "description": "目标·计划·复盘，一站式个人成长管理",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#4A90D9",
+  "icons": []
+}
