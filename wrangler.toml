@@ -1,0 +1,10 @@
+name = "growth-dashboard"
+pages_build_output_dir = "."
+compatibility_date = "2026-08-27"
+
+[vars]
+CRON_SECRET = "growth-dashboard-cron-2026"
+
+[[kv_namespaces]]
+binding = "GROWTH_KV"
+id = "PLACEHOLDER_REPLACE_AFTER_CREATING"
