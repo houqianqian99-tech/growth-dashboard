@@ -55,7 +55,8 @@ function monthlyPane(data, update) {
   const card = el('div', 'card');
   const title = h('h3', '');
   title.appendChild(h('span', '', '月度计划'));
-  const genBtn = el('button', 'btn-quick', '从年度目标自动生成');
+
+  const genBtn = el('button', 'btn-quick', '从年度目标生成');
   genBtn.addEventListener('click', () => {
     const goals = data.annualGoals || [];
     const now = new Date();
@@ -84,6 +85,54 @@ function monthlyPane(data, update) {
     update();
   });
   title.appendChild(genBtn);
+
+  const aiBtn = el('button', 'btn-quick', 'AI 分解手写内容');
+  aiBtn.style.marginLeft = '6px';
+  aiBtn.addEventListener('click', () => {
+    const goals = data.annualGoals || [];
+    const top3Text = (m.top3 || []).filter(Boolean).join('，');
+    const themeText = m.theme || '';
+    if (!top3Text && !themeText) {
+      toast('请先填写本月主题或 Top 3 目标', 'error');
+      return;
+    }
+    const goalsByName = {};
+    goals.forEach(g => { goalsByName[g.name] = g; });
+    const allKeywords = [];
+    if (top3Text) allKeywords.push(...m.top3.filter(Boolean));
+    const dims = ['A', 'B', 'C', 'D', 'E'];
+    dims.forEach((d, i) => {
+      const dimGoals = goals.filter(g => g.category === d);
+      const matched = [];
+      const unmatched = [];
+      m.top3.forEach(t => {
+        if (!t) return;
+        const found = goals.find(g => g.name === t || t.includes(g.name) || g.name.includes(t));
+        if (found && found.category === d) matched.push(found);
+        else if (dimGoals.length) {
+          unmatched.push(t);
+        }
+      });
+      const autoFill = matched.length ? matched : dimGoals.slice(0, 2);
+      if (m.goals && m.goals[i]) {
+        m.goals[i].target = autoFill.map(g => g.name).join('、') || dimGoals.map(g => g.name).join('、') || '';
+        m.goals[i].metric = autoFill.map(g => `${g.name}（当前${g.progress || 0}%）`).join('；') || '';
+      }
+    });
+    if (m.keyMetrics) {
+      const hasFitness = goals.some(g => g.name.includes('健身') || g.name.includes('作息'));
+      const hasContent = goals.some(g => g.category === 'B');
+      const hasReview = goals.some(g => g.name.includes('复盘'));
+      const hasBook = goals.some(g => g.name.includes('读书') || g.name.includes('阅读'));
+      m.keyMetrics.books = m.keyMetrics.books || 1;
+      m.keyMetrics.posts = m.keyMetrics.posts || 4;
+      m.keyMetrics.fitness = m.keyMetrics.fitness || 8;
+      m.keyMetrics.review = m.keyMetrics.review || 30;
+    }
+    toast('已根据手写主题分解五维度目标和指标', 'success');
+    update();
+  });
+  title.appendChild(aiBtn);
   card.appendChild(title);
 
   const themeBox = el('div');
@@ -165,25 +214,23 @@ function weeklyPane(data, update) {
   const card = el('div', 'card');
   const title = h('h3', '');
   title.appendChild(h('span', '', '周计划'));
-  const genBtn = el('button', 'btn-quick', '从月计划自动生成');
+
+  const genBtn = el('button', 'btn-quick', '从月计划生成');
   genBtn.addEventListener('click', () => {
     const m = data.plans.monthly;
     w.theme = m.theme ? `本周：${m.top3 ? m.top3[0] : ''} 专项推进` : '本周：按月计划推进';
-    const dims = ['A', 'B', 'C', 'D', 'E'];
     const dayFocus = [
-      { day: '周一', dim: 'A', text: '会计精学' },
-      { day: '周二', dim: 'A', text: '英语精读' },
-      { day: '周三', dim: 'B', text: '内容创作' },
-      { day: '周四', dim: 'A', text: '会计+写作' },
-      { day: '周五', dim: 'D', text: '读书+练字' },
-      { day: '周六', dim: 'B', text: '视频/播客录制' },
-      { day: '周日', dim: 'E', text: '周复盘+休整' }
+      { day: '周一', text: '会计精学' },
+      { day: '周二', text: '英语精读' },
+      { day: '周三', text: '内容创作' },
+      { day: '周四', text: '会计+写作' },
+      { day: '周五', text: '读书+练字' },
+      { day: '周六', text: '视频/播客录制' },
+      { day: '周日', text: '周复盘+休整' }
     ];
     if (w.schedule) {
       dayFocus.forEach((d, i) => {
-        if (w.schedule[i]) {
-          w.schedule[i].focus = d.text;
-        }
+        if (w.schedule[i]) w.schedule[i].focus = d.text;
       });
     }
     if (w.mustDo) {
@@ -195,6 +242,44 @@ function weeklyPane(data, update) {
     update();
   });
   title.appendChild(genBtn);
+
+  const aiBtn = el('button', 'btn-quick', 'AI 分解手写主题');
+  aiBtn.style.marginLeft = '6px';
+  aiBtn.addEventListener('click', () => {
+    const themeText = w.theme || '';
+    if (!themeText) {
+      toast('请先填写本周主题', 'error');
+      return;
+    }
+    const keywords = themeText.replace(/本周[：:]/, '').split(/[，,、+]/).map(s => s.trim()).filter(Boolean);
+    const dayFocus = [
+      '周一', '周二', '周三', '周四', '周五', '周六', '周日'
+    ];
+    const defaultSchedule = [
+      '会计精学', '英语精读', '内容创作', '会计+写作', '读书+练字', '视频/播客录制', '周复盘+休整'
+    ];
+    if (w.schedule) {
+      dayFocus.forEach((d, i) => {
+        if (w.schedule[i]) {
+          if (i < keywords.length) {
+            w.schedule[i].focus = keywords[i % keywords.length];
+          } else {
+            w.schedule[i].focus = defaultSchedule[i] || '机动';
+          }
+        }
+      });
+    }
+    if (w.mustDo) {
+      const top3 = keywords.slice(0, 3);
+      w.mustDo = top3.map((t, i) => ({ id: `w${i+1}`, text: t, done: false }));
+      while (w.mustDo.length < 3) {
+        w.mustDo.push({ id: `w${w.mustDo.length + 1}`, text: '', done: false });
+      }
+    }
+    toast('已根据手写主题分解每日安排和 Must-Do', 'success');
+    update();
+  });
+  title.appendChild(aiBtn);
   card.appendChild(title);
 
   const themeBox = el('div');
