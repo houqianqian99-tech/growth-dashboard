@@ -1,7 +1,10 @@
 name: Feishu Reminders
 on:
   schedule:
-    - cron: '0 */1 * * *'
+    - cron: '0 23 * * *'      # 北京 07:00 早安提醒
+    - cron: '0 1 * * 1-5'     # 北京 09:00 工作日会计备考
+    - cron: '0 12 * * *'      # 北京 20:00 复盘提醒
+    - cron: '0 14 * * *'     # 北京 22:00 打卡提醒
   workflow_dispatch:
 
 jobs:
@@ -17,3 +20,5 @@ jobs:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_BOT_OPEN_ID: ${{ secrets.FEISHU_BOT_OPEN_ID }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
