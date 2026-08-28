@@ -210,16 +210,90 @@ function weeklyPane(data, update) {
   const genBtn = el('button', 'btn-quick', '从月计划生成');
   genBtn.addEventListener('click', () => {
     const m = data.plans.monthly;
-    w.theme = m.theme ? `本周：${m.top3 ? m.top3[0] : ''} 专项推进` : '本周：按月计划推进';
-    const dayFocus = {
-      '周一': { A: '会计精学', B: '', C: '', D: '', E: '' },
-      '周二': { A: '英语精读', B: '', C: '', D: '', E: '' },
-      '周三': { A: '', B: '内容创作', C: '', D: '', E: '' },
-      '周四': { A: '会计+写作', B: '', C: '', D: '', E: '' },
-      '周五': { A: '', B: '', C: '', D: '读书+练字', E: '' },
-      '周六': { A: '', B: '视频/播客录制', C: '', D: '', E: '' },
-      '周日': { A: '', B: '', C: '', D: '', E: '周复盘+休整' }
+    const goals = data.annualGoals || [];
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const phaseGoals = goals.filter(g => {
+      const p = g.phase || 1;
+      if (month <= 4) return p === 1;
+      if (month <= 8) return p <= 2;
+      if (month <= 10) return p <= 3;
+      return true;
+    });
+    const p0Goals = phaseGoals.filter(g => g.priority === 'P0');
+    const p1Goals = phaseGoals.filter(g => g.priority === 'P1');
+    const top3 = (m.top3 || []).filter(Boolean);
+
+    w.theme = top3.length ? `本周：${top3.join(' + ')} 专项推进` : (m.theme || '本周：按月计划推进');
+
+    const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const dimMap = { A: [], B: [], C: [], D: [], E: [] };
+    phaseGoals.forEach(g => {
+      if (g.currentStatus && (g.currentStatus.includes('未开始') || g.currentStatus.includes('0'))) {
+        dimMap[g.category]?.push(g.name);
+      }
+    });
+    if (dimMap.A.length === 0) dimMap.A = phaseGoals.filter(g => g.category === 'A').map(g => g.name);
+    if (dimMap.B.length === 0) dimMap.B = phaseGoals.filter(g => g.category === 'B').map(g => g.name);
+    if (dimMap.C.length === 0) dimMap.C = phaseGoals.filter(g => g.category === 'C').map(g => g.name);
+    if (dimMap.D.length === 0) dimMap.D = phaseGoals.filter(g => g.category === 'D').map(g => g.name);
+    if (dimMap.E.length === 0) dimMap.E = phaseGoals.filter(g => g.category === 'E').map(g => g.name);
+
+    const dayFocus = {};
+    dayNames.forEach(day => {
+      dayFocus[day] = { A: '', B: '', C: '', D: '', E: '' };
+    });
+
+    dayFocus['周一'] = {
+      A: dimMap.A[0] ? `${dimMap.A[0]} 专项` : '',
+      B: p0Goals.find(g => g.category === 'B') ? `${p0Goals.find(g => g.category === 'B').name} 筹备` : '',
+      C: '规律作息+健身',
+      D: dimMap.D[0] ? `${dimMap.D[0]} 30min` : '',
+      E: ''
     };
+    dayFocus['周二'] = {
+      A: dimMap.A[1] ? `${dimMap.A[1]} 精学` : (dimMap.A[0] ? `${dimMap.A[0]} 练习` : ''),
+      B: p0Goals.find(g => g.category === 'B') ? `${p0Goals.find(g => g.category === 'B').name} 发布` : '',
+      C: '健身',
+      D: '',
+      E: ''
+    };
+    dayFocus['周三'] = {
+      A: dimMap.A[0] ? `${dimMap.A[0]} 巩固` : '',
+      B: phaseGoals.find(g => g.category === 'B') ? '内容创作+发布' : '',
+      C: '',
+      D: dimMap.D[1] ? `${dimMap.D[1]}` : '',
+      E: ''
+    };
+    dayFocus['周四'] = {
+      A: dimMap.A.slice(0, 2).map(n => n).join('+') + ' 复习' || '',
+      B: phaseGoals.find(g => g.category === 'B') ? '数据复盘+选题' : '',
+      C: '健身',
+      D: '',
+      E: ''
+    };
+    dayFocus['周五'] = {
+      A: '',
+      B: p0Goals.find(g => g.category === 'B') ? `${p0Goals.find(g => g.category === 'B').name} 优化` : '',
+      C: '',
+      D: dimMap.D[0] ? `${dimMap.D[0]}+练字` : '练字',
+      E: ''
+    };
+    dayFocus['周六'] = {
+      A: dimMap.A[0] ? `${dimMap.A[0]} 周总结` : '',
+      B: phaseGoals.find(g => g.category === 'B' && g.name.includes('播客')) ? '播客录制' : '视频/内容录制',
+      C: '外卖控制',
+      D: '',
+      E: ''
+    };
+    dayFocus['周日'] = {
+      A: '',
+      B: '',
+      C: '',
+      D: '',
+      E: '周复盘+休整'
+    };
+
     if (w.schedule) {
       Object.keys(dayFocus).forEach(day => {
         if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
@@ -229,10 +303,9 @@ function weeklyPane(data, update) {
       });
     }
     if (w.mustDo) {
-      const top3 = (m.top3 || []).filter(Boolean);
-      w.mustDo = [top3[0] || '', top3[1] || '', top3[2] || ''];
+      w.mustDo = [top3[0] || (p0Goals[0]?.name || ''), top3[1] || (p1Goals[0]?.name || ''), top3[2] || (p0Goals[1]?.name || '')];
     }
-    toast('周计划已从月计划自动生成', 'success');
+    toast('周计划已从月计划+年度目标智能生成', 'success');
     update();
   });
   title.appendChild(genBtn);
@@ -245,6 +318,7 @@ function weeklyPane(data, update) {
       toast('请先填写本周主题', 'error');
       return;
     }
+    const goals = data.annualGoals || [];
     const keywords = themeText.replace(/本周[：:]/, '').split(/[，,、+]/).map(s => s.trim()).filter(Boolean);
     const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     const dimMap = {
@@ -259,30 +333,42 @@ function weeklyPane(data, update) {
         if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
         ['A', 'B', 'C', 'D', 'E'].forEach(d => { w.schedule[day][d] = ''; });
       });
-      if (keywords.length === 0) {
-        w.schedule['周一']['A'] = '会计精学';
-        w.schedule['周二']['A'] = '英语精读';
-        w.schedule['周三']['B'] = '内容创作';
-        w.schedule['周四']['A'] = '会计+写作';
-        w.schedule['周五']['D'] = '读书+练字';
-        w.schedule['周六']['B'] = '视频/播客录制';
-        w.schedule['周日']['E'] = '周复盘+休整';
-      } else {
-        dayNames.forEach((day, i) => {
-          const kw = keywords[i % keywords.length];
-          let dim = 'A';
-          for (const [key, d] of Object.entries(dimMap)) {
-            if (kw.includes(key)) { dim = d; break; }
+
+      const p0B = goals.find(g => g.priority === 'P0' && g.category === 'B');
+      const p0C = goals.find(g => g.priority === 'P0' && g.category === 'C');
+
+      keywords.forEach((kw, i) => {
+        const day = dayNames[i % 7];
+        let dim = 'A';
+        for (const [key, d] of Object.entries(dimMap)) {
+          if (kw.includes(key)) { dim = d; break; }
+        }
+        w.schedule[day][dim] = kw;
+      });
+
+      dayNames.forEach((day, i) => {
+        const isWeekday = i < 5;
+        const hasContent = ['A','B','C','D','E'].some(d => w.schedule[day][d]);
+        if (!hasContent) {
+          if (isWeekday) {
+            w.schedule[day]['A'] = goals.find(g => g.category === 'A' && g.name.includes('会计')) ? '会计备考' : '';
           }
-          w.schedule[day][dim] = kw;
-        });
-        if (!w.schedule['周日']['E']) w.schedule['周日']['E'] = '周复盘+休整';
-      }
+        }
+        if (isWeekday && !w.schedule[day]['C']) {
+          w.schedule[day]['C'] = p0C ? '健身/作息打卡' : '';
+        }
+        if (isWeekday && !w.schedule[day]['B'] && p0B) {
+          w.schedule[day]['B'] = i % 2 === 0 ? `${p0B.name} 筹备` : `${p0B.name} 发布`;
+        }
+      });
+
+      if (!w.schedule['周六']['B']) w.schedule['周六']['B'] = goals.find(g => g.name.includes('播客')) ? '播客录制' : '视频/内容录制';
+      w.schedule['周日']['E'] = '周复盘+休整';
     }
     if (w.mustDo) {
       w.mustDo = [keywords[0] || '', keywords[1] || '', keywords[2] || ''];
     }
-    toast('已根据手写主题分解每日安排和 Must-Do', 'success');
+    toast('已根据手写主题智能分解每日安排和 Must-Do', 'success');
     update();
   });
   title.appendChild(aiBtn);
