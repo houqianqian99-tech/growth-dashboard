@@ -211,101 +211,110 @@ function weeklyPane(data, update) {
   genBtn.addEventListener('click', () => {
     const m = data.plans.monthly;
     const goals = data.annualGoals || [];
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const phaseGoals = goals.filter(g => {
-      const p = g.phase || 1;
-      if (month <= 4) return p === 1;
-      if (month <= 8) return p <= 2;
-      if (month <= 10) return p <= 3;
-      return true;
-    });
-    const p0Goals = phaseGoals.filter(g => g.priority === 'P0');
-    const p1Goals = phaseGoals.filter(g => g.priority === 'P1');
     const top3 = (m.top3 || []).filter(Boolean);
+
+    const matchedGoals = top3.map(t => goals.find(g => g.name === t || t.includes(g.name) || g.name.includes(t))).filter(Boolean);
+    const primaryGoals = matchedGoals.length ? matchedGoals : goals.filter(g => g.priority === 'P0').slice(0, 3);
 
     w.theme = top3.length ? `本周：${top3.join(' + ')} 专项推进` : (m.theme || '本周：按月计划推进');
 
     const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const dimMap = { A: [], B: [], C: [], D: [], E: [] };
-    phaseGoals.forEach(g => {
-      if (g.currentStatus && (g.currentStatus.includes('未开始') || g.currentStatus.includes('0'))) {
-        dimMap[g.category]?.push(g.name);
+    const sched = {};
+    dayNames.forEach(d => { sched[d] = { A: '', B: '', C: '', D: '', E: '' }; });
+
+    const goalA = goals.find(g => g.name === '会计考证');
+    const goalB = goals.find(g => g.name === '小红书运营');
+    const goalEng = goals.find(g => g.name === '英语雅思');
+    const goalFit = goals.find(g => g.name === '健身');
+    const goalSleep = goals.find(g => g.name === '规律作息');
+    const goalRead = goals.find(g => g.name === '读书');
+    const goalReview = goals.find(g => g.name === '日复盘');
+    const goalCall = goals.find(g => g.name === '练字');
+    const goalPod = goals.find(g => g.name === '播客');
+    const goalTakeout = goals.find(g => g.name === '尽量不点外卖');
+
+    const isPrimaryA = primaryGoals.some(g => g.name === '会计考证');
+    const isPrimaryB = primaryGoals.some(g => g.name === '小红书运营');
+
+    if (isPrimaryA || goalA) {
+      sched['周一']['A'] = '会计：经济法基础 第一章精学';
+      sched['周二']['A'] = '会计：经济法基础 第一章习题';
+      sched['周三']['A'] = '会计：经济法基础 第二章';
+      sched['周四']['A'] = '会计：初级会计实务 第一章';
+      sched['周五']['A'] = '会计：错题回顾+章节测试';
+      sched['周六']['A'] = '会计：本周总结+薄弱点攻坚';
+    }
+
+    if (isPrimaryB || goalB) {
+      if (goalB && goalB.currentStatus && goalB.currentStatus.includes('未开始')) {
+        sched['周一']['B'] = '小红书：账号搭建+主页装修';
+        sched['周二']['B'] = '小红书：选题库建立+拍摄第1篇';
+        sched['周三']['B'] = '小红书：修图+文案+发布第1篇';
+        sched['周四']['B'] = '小红书：数据复盘+评论区互动';
+        sched['周五']['B'] = '小红书：选题+拍摄第2篇';
+        sched['周六']['B'] = '小红书：发布第2篇+涨粉互动';
+      } else {
+        sched['周一']['B'] = '小红书：选题+拍摄';
+        sched['周三']['B'] = '小红书：修图+发布';
+        sched['周五']['B'] = '小红书：数据复盘+互动';
+        sched['周六']['B'] = '小红书：发布第2篇+涨粉';
+      }
+    } else if (goalPod) {
+      sched['周六']['B'] = '播客：选题+录制';
+    }
+
+    if (goalEng && primaryGoals.some(g => g.name === '英语雅思')) {
+      sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / 雅思听力' : '雅思：听力Part1精听';
+      sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / 雅思阅读' : '雅思：阅读精读+词汇';
+      sched['周六']['A'] = sched['周六']['A'] ? sched['周六']['A'] + ' / 雅思写作' : '雅思：写作小作文';
+    } else if (goalEng) {
+      sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / 雅思听力' : '雅思：听力30min';
+      sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / 雅思阅读' : '雅思：阅读+词汇';
+    }
+
+    dayNames.forEach((day, i) => {
+      const isWeekday = i < 5;
+      if (isWeekday) {
+        if (goalSleep) sched[day]['C'] = sched[day]['C'] || '7:00前起/23:00前睡';
+        if (goalFit && (i === 0 || i === 2 || i === 4)) {
+          sched[day]['C'] = (sched[day]['C'] ? sched[day]['C'] + ' + ' : '') + '健身：力量40min';
+        } else if (goalFit && (i === 1 || i === 3)) {
+          sched[day]['C'] = (sched[day]['C'] ? sched[day]['C'] + ' + ' : '') + '健身：有氧30min';
+        }
+        if (goalTakeout) sched[day]['C'] = sched[day]['C'] + ' / 不点外卖';
+      }
+      if (isWeekday && goalRead) {
+        sched[day]['D'] = sched[day]['D'] || '读书30min';
+      }
+      if (isWeekday && goalCall) {
+        sched[day]['D'] = (sched[day]['D'] ? sched[day]['D'] + ' + ' : '') + '练字15min';
+      }
+      if (isWeekday && goalReview) {
+        sched[day]['E'] = sched[day]['E'] || '日复盘（睡前10min）';
       }
     });
-    if (dimMap.A.length === 0) dimMap.A = phaseGoals.filter(g => g.category === 'A').map(g => g.name);
-    if (dimMap.B.length === 0) dimMap.B = phaseGoals.filter(g => g.category === 'B').map(g => g.name);
-    if (dimMap.C.length === 0) dimMap.C = phaseGoals.filter(g => g.category === 'C').map(g => g.name);
-    if (dimMap.D.length === 0) dimMap.D = phaseGoals.filter(g => g.category === 'D').map(g => g.name);
-    if (dimMap.E.length === 0) dimMap.E = phaseGoals.filter(g => g.category === 'E').map(g => g.name);
 
-    const dayFocus = {};
-    dayNames.forEach(day => {
-      dayFocus[day] = { A: '', B: '', C: '', D: '', E: '' };
-    });
-
-    dayFocus['周一'] = {
-      A: dimMap.A[0] ? `${dimMap.A[0]} 专项` : '',
-      B: p0Goals.find(g => g.category === 'B') ? `${p0Goals.find(g => g.category === 'B').name} 筹备` : '',
-      C: '规律作息+健身',
-      D: dimMap.D[0] ? `${dimMap.D[0]} 30min` : '',
-      E: ''
-    };
-    dayFocus['周二'] = {
-      A: dimMap.A[1] ? `${dimMap.A[1]} 精学` : (dimMap.A[0] ? `${dimMap.A[0]} 练习` : ''),
-      B: p0Goals.find(g => g.category === 'B') ? `${p0Goals.find(g => g.category === 'B').name} 发布` : '',
-      C: '健身',
-      D: '',
-      E: ''
-    };
-    dayFocus['周三'] = {
-      A: dimMap.A[0] ? `${dimMap.A[0]} 巩固` : '',
-      B: phaseGoals.find(g => g.category === 'B') ? '内容创作+发布' : '',
-      C: '',
-      D: dimMap.D[1] ? `${dimMap.D[1]}` : '',
-      E: ''
-    };
-    dayFocus['周四'] = {
-      A: dimMap.A.slice(0, 2).map(n => n).join('+') + ' 复习' || '',
-      B: phaseGoals.find(g => g.category === 'B') ? '数据复盘+选题' : '',
-      C: '健身',
-      D: '',
-      E: ''
-    };
-    dayFocus['周五'] = {
-      A: '',
-      B: p0Goals.find(g => g.category === 'B') ? `${p0Goals.find(g => g.category === 'B').name} 优化` : '',
-      C: '',
-      D: dimMap.D[0] ? `${dimMap.D[0]}+练字` : '练字',
-      E: ''
-    };
-    dayFocus['周六'] = {
-      A: dimMap.A[0] ? `${dimMap.A[0]} 周总结` : '',
-      B: phaseGoals.find(g => g.category === 'B' && g.name.includes('播客')) ? '播客录制' : '视频/内容录制',
-      C: '外卖控制',
-      D: '',
-      E: ''
-    };
-    dayFocus['周日'] = {
-      A: '',
-      B: '',
-      C: '',
-      D: '',
-      E: '周复盘+休整'
-    };
+    sched['周六']['D'] = sched['周六']['D'] || (goalRead ? '读书1小时' : '');
+    if (goalTakeout) sched['周六']['C'] = (sched['周六']['C'] ? sched['周六']['C'] + ' + ' : '') + '外卖控制';
+    sched['周日']['E'] = '周复盘+下周计划+休整';
 
     if (w.schedule) {
-      Object.keys(dayFocus).forEach(day => {
+      Object.keys(sched).forEach(day => {
         if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
-        Object.keys(dayFocus[day]).forEach(dim => {
-          w.schedule[day][dim] = dayFocus[day][dim];
+        Object.keys(sched[day]).forEach(dim => {
+          w.schedule[day][dim] = sched[day][dim];
         });
       });
     }
+
     if (w.mustDo) {
-      w.mustDo = [top3[0] || (p0Goals[0]?.name || ''), top3[1] || (p1Goals[0]?.name || ''), top3[2] || (p0Goals[1]?.name || '')];
+      w.mustDo = [
+        top3[0] || (primaryGoals[0]?.name || ''),
+        top3[1] || (primaryGoals[1]?.name || ''),
+        top3[2] || (primaryGoals[2]?.name || '')
+      ];
     }
-    toast('周计划已从月计划+年度目标智能生成', 'success');
+    toast('周计划已从月计划Top3+年度目标智能生成', 'success');
     update();
   });
   title.appendChild(genBtn);
@@ -321,54 +330,91 @@ function weeklyPane(data, update) {
     const goals = data.annualGoals || [];
     const keywords = themeText.replace(/本周[：:]/, '').split(/[，,、+]/).map(s => s.trim()).filter(Boolean);
     const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const dimMap = {
-      '会计': 'A', '英语': 'A', '雅思': 'A', '学': 'A', '写作': 'A', 'PS': 'A', '剪辑': 'A',
+
+    const keywordDim = {
+      '会计': 'A', '英语': 'A', '雅思': 'A', '写作': 'A', 'PS': 'A', '剪辑': 'A',
       '小红书': 'B', '抖音': 'B', '哔哩': 'B', '视频': 'B', '播客': 'B', '内容': 'B', '运营': 'B',
       '健身': 'C', '运动': 'C', '作息': 'C', '外卖': 'C',
-      '读书': 'D', '阅读': 'D', '观影': 'D', '书': 'D',
+      '读书': 'D', '阅读': 'D', '观影': 'D', '练字': 'D',
       '复盘': 'E', '计划': 'E', '整理': 'E'
     };
+
+    const keywordTasks = {
+      '会计': ['经济法基础 第一章精学', '经济法基础 第一章习题', '经济法基础 第二章', '初级会计实务 第一章', '错题回顾+章节测试', '本周总结+薄弱点'],
+      '英语': ['听力Part1精听', '阅读精读+词汇', '写作小作文', '口语Part1练习', '听力Part2', '写作大作文'],
+      '雅思': ['听力Part1精听', '阅读精读+词汇', '写作小作文', '口语Part1练习', '听力Part2', '写作大作文'],
+      '小红书': ['账号搭建+主页装修', '选题+拍摄第1篇', '修图+文案+发布', '数据复盘+互动', '选题+拍摄第2篇', '发布第2篇+涨粉'],
+      '抖音': ['选题+脚本', '拍摄+剪辑', '发布+评论区互动', '数据复盘+选题', '拍摄第2条', '发布+涨粉互动'],
+      '播客': ['选题+大纲', '写稿+素材整理', '录制', '后期剪辑', '发布+宣传', '下期选题'],
+      '健身': ['力量训练40min', '有氧30min', '力量训练40min', '有氧30min', '力量训练40min', '拉伸放松'],
+      '读书': ['读书30min', '读书30min', '读书30min', '读书30min', '读书30min', '读书1小时'],
+      '写作': ['练笔500字', '素材收集', '练笔500字', '模仿爆款拆解', '练笔800字', '本周文章整理'],
+      '复盘': ['日复盘', '日复盘', '日复盘', '日复盘', '日复盘', '周复盘']
+    };
+
+    const sched = {};
+    dayNames.forEach(d => { sched[d] = { A: '', B: '', C: '', D: '', E: '' }; });
+
+    keywords.forEach(kw => {
+      let matched = false;
+      for (const [key, dim] of Object.entries(keywordDim)) {
+        if (kw.toLowerCase().includes(key.toLowerCase())) {
+          const tasks = keywordTasks[key] || [];
+          const dayIdx = dayNames.indexOf(dayNames.find(d => !sched[d][dim]) || dayNames[0]);
+          const usedDays = [];
+          tasks.forEach((task, i) => {
+            const day = dayNames[i % 7];
+            if (!usedDays.includes(day)) {
+              sched[day][dim] = sched[day][dim] ? sched[day][dim] + ' + ' + task : `${kw.split(/[：:]/)[0]}：${task}`;
+              usedDays.push(day);
+            }
+          });
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        const day = dayNames.find(d => !sched[d]['A']) || dayNames[0];
+        sched[day]['A'] = kw;
+      }
+    });
+
+    const goalSleep = goals.find(g => g.name === '规律作息');
+    const goalFit = goals.find(g => g.name === '健身');
+    const goalRead = goals.find(g => g.name === '读书');
+    const goalCall = goals.find(g => g.name === '练字');
+    const goalReview = goals.find(g => g.name === '日复盘');
+    const goalTakeout = goals.find(g => g.name === '尽量不点外卖');
+
+    dayNames.forEach((day, i) => {
+      const isWeekday = i < 5;
+      if (isWeekday) {
+        if (goalSleep && !sched[day]['C']) sched[day]['C'] = '7:00前起/23:00前睡';
+        if (goalFit && !sched[day]['C'].includes('健身')) {
+          const fitTask = (i === 0 || i === 2 || i === 4) ? '力量40min' : '有氧30min';
+          sched[day]['C'] = sched[day]['C'] ? sched[day]['C'] + ' + 健身' + fitTask : '健身' + fitTask;
+        }
+        if (goalTakeout) sched[day]['C'] = sched[day]['C'] ? sched[day]['C'] + ' / 不点外卖' : '不点外卖';
+        if (goalRead && !sched[day]['D']) sched[day]['D'] = '读书30min';
+        if (goalCall && !sched[day]['D'].includes('练字')) sched[day]['D'] = sched[day]['D'] ? sched[day]['D'] + ' + 练字15min' : '练字15min';
+        if (goalReview && !sched[day]['E']) sched[day]['E'] = '日复盘（睡前10min）';
+      }
+    });
+
+    sched['周日']['E'] = sched['周日']['E'] || '周复盘+下周计划+休整';
+
     if (w.schedule) {
-      dayNames.forEach(day => {
+      Object.keys(sched).forEach(day => {
         if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
-        ['A', 'B', 'C', 'D', 'E'].forEach(d => { w.schedule[day][d] = ''; });
+        Object.keys(sched[day]).forEach(dim => {
+          w.schedule[day][dim] = sched[day][dim];
+        });
       });
-
-      const p0B = goals.find(g => g.priority === 'P0' && g.category === 'B');
-      const p0C = goals.find(g => g.priority === 'P0' && g.category === 'C');
-
-      keywords.forEach((kw, i) => {
-        const day = dayNames[i % 7];
-        let dim = 'A';
-        for (const [key, d] of Object.entries(dimMap)) {
-          if (kw.includes(key)) { dim = d; break; }
-        }
-        w.schedule[day][dim] = kw;
-      });
-
-      dayNames.forEach((day, i) => {
-        const isWeekday = i < 5;
-        const hasContent = ['A','B','C','D','E'].some(d => w.schedule[day][d]);
-        if (!hasContent) {
-          if (isWeekday) {
-            w.schedule[day]['A'] = goals.find(g => g.category === 'A' && g.name.includes('会计')) ? '会计备考' : '';
-          }
-        }
-        if (isWeekday && !w.schedule[day]['C']) {
-          w.schedule[day]['C'] = p0C ? '健身/作息打卡' : '';
-        }
-        if (isWeekday && !w.schedule[day]['B'] && p0B) {
-          w.schedule[day]['B'] = i % 2 === 0 ? `${p0B.name} 筹备` : `${p0B.name} 发布`;
-        }
-      });
-
-      if (!w.schedule['周六']['B']) w.schedule['周六']['B'] = goals.find(g => g.name.includes('播客')) ? '播客录制' : '视频/内容录制';
-      w.schedule['周日']['E'] = '周复盘+休整';
     }
     if (w.mustDo) {
       w.mustDo = [keywords[0] || '', keywords[1] || '', keywords[2] || ''];
     }
-    toast('已根据手写主题智能分解每日安排和 Must-Do', 'success');
+    toast('已根据手写主题智能分解到每日具体任务', 'success');
     update();
   });
   title.appendChild(aiBtn);
