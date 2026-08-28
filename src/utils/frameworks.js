@@ -65,7 +65,8 @@ export const MONTHLY_TEMPLATE = {
     { dimension: 'D', target: '', metric: '' },
     { dimension: 'E', target: '', metric: '' }
   ],
-  keyMetrics: { books: 0, posts: 0, fitness: 0, review: 0 }
+  keyMetrics: { books: 0, posts: 0, fitness: 0, review: 0 },
+  calendarTasks: []
 };
 
 export const WEEKLY_TEMPLATE = {
