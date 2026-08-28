@@ -232,9 +232,13 @@ function weeklyPane(data, update) {
     const goalCall = goals.find(g => g.name === '练字');
     const goalPod = goals.find(g => g.name === '播客');
     const goalTakeout = goals.find(g => g.name === '尽量不点外卖');
+    const goalDy = goals.find(g => g.name === '抖音运营');
 
     const isPrimaryA = primaryGoals.some(g => g.name === '会计考证');
-    const isPrimaryB = primaryGoals.some(g => g.name === '小红书运营');
+    const isPrimaryXhs = primaryGoals.some(g => g.name === '小红书运营');
+    const isPrimaryPod = primaryGoals.some(g => g.name === '播客');
+    const isPrimaryDy = primaryGoals.some(g => g.name === '抖音运营');
+    const isPrimaryEng = primaryGoals.some(g => g.name === '英语雅思');
 
     if (isPrimaryA || goalA) {
       sched['周一']['A'] = '会计：经济法基础 第一章精学';
@@ -245,31 +249,57 @@ function weeklyPane(data, update) {
       sched['周六']['A'] = '会计：本周总结+薄弱点攻坚';
     }
 
-    if (isPrimaryB || goalB) {
-      if (goalB && goalB.currentStatus && goalB.currentStatus.includes('未开始')) {
-        sched['周一']['B'] = '小红书：账号搭建+主页装修';
-        sched['周二']['B'] = '小红书：选题库建立+拍摄第1篇';
-        sched['周三']['B'] = '小红书：修图+文案+发布第1篇';
-        sched['周四']['B'] = '小红书：数据复盘+评论区互动';
-        sched['周五']['B'] = '小红书：选题+拍摄第2篇';
-        sched['周六']['B'] = '小红书：发布第2篇+涨粉互动';
-      } else {
-        sched['周一']['B'] = '小红书：选题+拍摄';
-        sched['周三']['B'] = '小红书：修图+发布';
-        sched['周五']['B'] = '小红书：数据复盘+互动';
-        sched['周六']['B'] = '小红书：发布第2篇+涨粉';
-      }
-    } else if (goalPod) {
-      sched['周六']['B'] = '播客：选题+录制';
+    const bGoals = primaryGoals.filter(g => g.category === 'B');
+    if (bGoals.length === 0) {
+      if (goalB) bGoals.push(goalB);
+      else if (goalPod) bGoals.push(goalPod);
+      else if (goalDy) bGoals.push(goalDy);
     }
 
-    if (goalEng && primaryGoals.some(g => g.name === '英语雅思')) {
-      sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / 雅思听力' : '雅思：听力Part1精听';
-      sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / 雅思阅读' : '雅思：阅读精读+词汇';
-      sched['周六']['A'] = sched['周六']['A'] ? sched['周六']['A'] + ' / 雅思写作' : '雅思：写作小作文';
-    } else if (goalEng) {
-      sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / 雅思听力' : '雅思：听力30min';
-      sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / 雅思阅读' : '雅思：阅读+词汇';
+    const xhsTasksNew = ['账号搭建+主页装修', '选题库建立+拍摄第1篇', '修图+文案+发布第1篇', '数据复盘+评论区互动', '选题+拍摄第2篇', '发布第2篇+涨粉互动'];
+    const xhsTasks = ['选题+拍摄', '修图+文案', '发布+互动', '数据复盘', '选题+拍摄第2篇', '发布+涨粉'];
+    const podTasks = ['选题+大纲', '写稿+素材整理', '录制', '后期剪辑', '发布+宣传', '下期选题+复盘'];
+    const dyTasks = ['选题+脚本', '拍摄+剪辑', '发布+互动', '数据复盘', '拍摄第2条', '发布+涨粉'];
+
+    const getBTasks = (g) => {
+      if (g.name.includes('小红书')) {
+        return (g.currentStatus && g.currentStatus.includes('未开始')) ? xhsTasksNew : xhsTasks;
+      }
+      if (g.name.includes('播客')) return podTasks;
+      if (g.name.includes('抖音')) return dyTasks;
+      return xhsTasks;
+    };
+
+    const bDayMap = {
+      '周一': 0, '周二': 1, '周三': 2, '周四': 3, '周五': 4, '周六': 5
+    };
+
+    if (bGoals.length === 1) {
+      const g = bGoals[0];
+      const tasks = getBTasks(g);
+      Object.keys(bDayMap).forEach(day => {
+        sched[day]['B'] = `${g.name}：${tasks[bDayMap[day]]}`;
+      });
+    } else if (bGoals.length >= 2) {
+      const g1 = bGoals[0];
+      const g2 = bGoals[1];
+      const t1 = getBTasks(g1);
+      const t2 = getBTasks(g2);
+      sched['周一']['B'] = `${g1.name}：${t1[0]}`;
+      sched['周二']['B'] = `${g2.name}：${t2[0]}`;
+      sched['周三']['B'] = `${g1.name}：${t1[2]}`;
+      sched['周四']['B'] = `${g2.name}：${t2[2]}`;
+      sched['周五']['B'] = `${g1.name}：${t1[4]}`;
+      sched['周六']['B'] = `${g2.name}：${t2[5]}`;
+    }
+
+    if (isPrimaryEng || goalEng) {
+      const engTasks = isPrimaryEng
+        ? ['听力Part1精听', '阅读精读+词汇', '写作小作文', '口语Part1练习']
+        : ['听力30min', '阅读+词汇', '写作小作文', '听力+阅读'];
+      sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / ' + engTasks[0] : '雅思：' + engTasks[0];
+      sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / ' + engTasks[1] : '雅思：' + engTasks[1];
+      sched['周六']['A'] = sched['周六']['A'] ? sched['周六']['A'] + ' / ' + engTasks[2] : '雅思：' + engTasks[2];
     }
 
     dayNames.forEach((day, i) => {
