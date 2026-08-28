@@ -5,5 +5,8 @@
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.73.0",
+    "ws": "^8.21.3"
+  }
 }
