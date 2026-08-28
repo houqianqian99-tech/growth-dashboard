@@ -81,9 +81,18 @@ export function renderGoals(data, update) {
 function goalCardEl(g, data, update) {
   const card = el('div', 'goal-card');
   card.appendChild(h('div', 'g-title', g.name));
+
+  if (g.targetDesc) {
+    const descEl = el('div', 'g-target-desc');
+    descEl.style.cssText = 'font-size:12px;color:var(--accent);font-weight:600;margin:4px 0;';
+    descEl.textContent = '🎯 ' + g.targetDesc;
+    card.appendChild(descEl);
+  }
+
   const days = daysUntil(g.target);
   const targetText = days >= 0 ? `距 ${g.target} 还有 ${days} 天` : `已于 ${g.target} 到期`;
   card.appendChild(h('div', 'g-value', targetText));
+
   const bar = el('div', 'g-progress');
   const fill = el('div', 'fill');
   const p = g.progress || 0;
@@ -91,6 +100,17 @@ function goalCardEl(g, data, update) {
   fill.style.background = progressBg(p);
   bar.appendChild(fill);
   card.appendChild(bar);
+
+  const statusRow = el('div', 'g-status-row');
+  statusRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-size:12px;margin:4px 0;';
+  const progressLabel = el('span', '', `进度 ${p}%`);
+  progressLabel.style.color = 'var(--text-2)';
+  const currentLabel = el('span', '', g.currentStatus || '未开始');
+  currentLabel.style.cssText = 'color:var(--text-2);font-size:11px;';
+  statusRow.appendChild(progressLabel);
+  statusRow.appendChild(currentLabel);
+  card.appendChild(statusRow);
+
   const meta = el('div', 'g-meta');
   meta.innerHTML = `<span class="badge badge-${(g.priority || 'P2').toLowerCase()}">${g.priority || 'P2'}</span><span class="badge badge-phase">${phaseLabel(g.phase)}</span>`;
   card.appendChild(meta);
@@ -117,7 +137,7 @@ function goalCardEl(g, data, update) {
 
 function openGoalModal(goal, data, update) {
   const isEdit = !!goal;
-  const g = goal || { id: '', name: '', target: '', progress: 0, category: 'A', priority: 'P1', phase: 1 };
+  const g = goal || { id: '', name: '', target: '', progress: 0, category: 'A', priority: 'P1', phase: 1, targetDesc: '', currentStatus: '' };
   const catOpts = Object.keys(GOAL_CATEGORIES).map(k =>
     `<option value="${k}">${GOAL_CATEGORIES[k].icon} ${GOAL_CATEGORIES[k].name}</option>`
   ).join('');
@@ -127,6 +147,14 @@ function openGoalModal(goal, data, update) {
       <div class="form-row">
         <label>目标名称</label>
         <input id="gm-name" value="${g.name}" placeholder="如：会计考证" />
+      </div>
+      <div class="form-row">
+        <label>量化标准</label>
+        <input id="gm-target-desc" value="${g.targetDesc || ''}" placeholder="如：双科≥60分 / 雅思6.5+" />
+      </div>
+      <div class="form-row">
+        <label>当前状态</label>
+        <input id="gm-current-status" value="${g.currentStatus || ''}" placeholder="如：模考5.5分 / 已刷题200道" />
       </div>
       <div class="form-row">
         <label>目标日期</label>
@@ -168,6 +196,8 @@ function openGoalModal(goal, data, update) {
     overlay.querySelector('#gm-phase').value = g.phase;
     overlay.querySelector('#gm-save').addEventListener('click', () => {
       const name = overlay.querySelector('#gm-name').value.trim();
+      const targetDesc = overlay.querySelector('#gm-target-desc').value.trim();
+      const currentStatus = overlay.querySelector('#gm-current-status').value.trim();
       const target = overlay.querySelector('#gm-target').value;
       const progress = Number(overlay.querySelector('#gm-progress').value) || 0;
       const category = overlay.querySelector('#gm-category').value;
@@ -176,9 +206,9 @@ function openGoalModal(goal, data, update) {
       if (!name) { toast('请输入目标名称', 'error'); return; }
       if (!target) { toast('请选择目标日期', 'error'); return; }
       if (isEdit) {
-        Object.assign(goal, { name, target, progress, category, priority, phase });
+        Object.assign(goal, { name, targetDesc, currentStatus, target, progress, category, priority, phase });
       } else {
-        data.annualGoals.push({ id: uid('g'), name, target, progress, category, priority, phase });
+        data.annualGoals.push({ id: uid('g'), name, targetDesc, currentStatus, target, progress, category, priority, phase });
       }
       closeModal(overlay);
       toast(isEdit ? '已更新目标' : '已添加目标', 'success');
