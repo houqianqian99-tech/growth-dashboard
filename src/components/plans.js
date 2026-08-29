@@ -93,7 +93,51 @@ function monthlyPane(data, update) {
     });
     const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
     m.theme = `${monthNames[month - 1]}：${p0.concat(p1).slice(0, 3).join(' + ')} 重点突破`;
+
+    if (!m.keyMetrics) m.keyMetrics = {};
+    const hasBook = goals.some(g => g.name.includes('读书') || g.name.includes('阅读'));
+    const hasContent = goals.some(g => g.category === 'B');
+    const hasFitness = goals.some(g => g.name.includes('健身'));
+    const hasReview = goals.some(g => g.name.includes('复盘'));
+    const totalWeeks = 4;
+    m.keyMetrics.books = hasBook ? 2 : 0;
+    m.keyMetrics.posts = hasContent ? 8 : 0;
+    m.keyMetrics.fitness = hasFitness ? 20 : 0;
+    m.keyMetrics.review = hasReview ? 30 : 0;
+
     if (!m.calendarTasks) m.calendarTasks = [];
+    const year = now.getFullYear();
+    const mon = now.getMonth();
+    const firstDay = new Date(year, mon, 1).getDay();
+    const firstMonday = firstDay === 1 ? 1 : (1 + (8 - firstDay) % 7);
+
+    const bGoal = goals.find(g => g.category === 'B' && (g.priority === 'P0' || g.priority === 'P1'));
+    const aGoal = goals.find(g => g.category === 'A' && (g.priority === 'P0' || g.priority === 'P1'));
+
+    const contentTasks = [
+      { day: firstMonday, text: '选题+脚本', dim: 'B' },
+      { day: firstMonday + 2, text: '拍摄+剪辑', dim: 'B' },
+      { day: firstMonday + 4, text: '发布+互动', dim: 'B' },
+      { day: firstMonday + 7, text: '数据复盘+选题', dim: 'B' },
+      { day: firstMonday + 9, text: '拍摄第2期', dim: 'B' },
+      { day: firstMonday + 11, text: '发布第2期', dim: 'B' },
+      { day: firstMonday + 14, text: '选题+拍摄第3期', dim: 'B' },
+      { day: firstMonday + 16, text: '后期+发布', dim: 'B' },
+      { day: firstMonday + 21, text: '月度内容复盘', dim: 'B' }
+    ];
+
+    const daysInMonth = new Date(year, mon + 1, 0).getDate();
+    contentTasks.forEach((t, i) => {
+      if (t.day <= daysInMonth && bGoal) {
+        m.calendarTasks.push({
+          id: 'ct_m' + mon + '_' + i,
+          date: `${year}-${String(mon + 1).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`,
+          text: t.text,
+          dim: t.dim
+        });
+      }
+    });
+
     auto.lastMonthlyGenMonth = monthKey;
   }
 
@@ -127,7 +171,48 @@ function monthlyPane(data, update) {
     });
     const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
     m.theme = `${monthNames[month - 1]}：${p0.concat(p1).slice(0, 3).join(' + ')} 重点突破`;
-    toast('月计划已从年度目标自动生成', 'success');
+
+    if (!m.keyMetrics) m.keyMetrics = {};
+    const hasBook = goals.some(g => g.name.includes('读书') || g.name.includes('阅读'));
+    const hasContent = goals.some(g => g.category === 'B');
+    const hasFitness = goals.some(g => g.name.includes('健身'));
+    const hasReview = goals.some(g => g.name.includes('复盘'));
+    m.keyMetrics.books = hasBook ? 2 : 0;
+    m.keyMetrics.posts = hasContent ? 8 : 0;
+    m.keyMetrics.fitness = hasFitness ? 20 : 0;
+    m.keyMetrics.review = hasReview ? 30 : 0;
+
+    if (!m.calendarTasks) m.calendarTasks = [];
+    m.calendarTasks = [];
+    const year = now.getFullYear();
+    const mon = now.getMonth();
+    const firstDay = new Date(year, mon, 1).getDay();
+    const firstMonday = firstDay === 1 ? 1 : (1 + (8 - firstDay) % 7);
+    const bGoal = goals.find(g => g.category === 'B' && (g.priority === 'P0' || g.priority === 'P1'));
+    const contentTasks = [
+      { day: firstMonday, text: '选题+脚本', dim: 'B' },
+      { day: firstMonday + 2, text: '拍摄+剪辑', dim: 'B' },
+      { day: firstMonday + 4, text: '发布+互动', dim: 'B' },
+      { day: firstMonday + 7, text: '数据复盘+选题', dim: 'B' },
+      { day: firstMonday + 9, text: '拍摄第2期', dim: 'B' },
+      { day: firstMonday + 11, text: '发布第2期', dim: 'B' },
+      { day: firstMonday + 14, text: '选题+拍摄第3期', dim: 'B' },
+      { day: firstMonday + 16, text: '后期+发布', dim: 'B' },
+      { day: firstMonday + 21, text: '月度内容复盘', dim: 'B' }
+    ];
+    const daysInMonth = new Date(year, mon + 1, 0).getDate();
+    contentTasks.forEach((t, i) => {
+      if (t.day <= daysInMonth && bGoal) {
+        m.calendarTasks.push({
+          id: 'ct_m' + mon + '_' + i,
+          date: `${year}-${String(mon + 1).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`,
+          text: t.text,
+          dim: t.dim
+        });
+      }
+    });
+
+    toast('月计划已从年度目标自动生成（含月历任务）', 'success');
     update();
   });
   title.appendChild(genBtn);
