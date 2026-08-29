@@ -167,11 +167,15 @@ function getDefaultData() {
     },
     automation: {
       autoDaily: true,
+      autoWeekly: true,
+      autoMonthly: true,
       reminderTimes: { wakeUp: '06:30', review: '20:00', sleep: '22:00' },
       autoReview: true,
       autoWeeklyReport: true,
       autoMonthlyReport: true,
       lastDailyGenDate: '',
+      lastWeeklyGenWeek: '',
+      lastMonthlyGenMonth: '',
       lastWeeklyReport: null,
       lastMonthlyReport: null
     },

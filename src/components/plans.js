@@ -50,8 +50,53 @@ export function renderPlans(data, update) {
   return root;
 }
 
+function getMonthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getWeekKey(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + 4 - (date.getDay() || 7));
+  const yearStart = new Date(date.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
 function monthlyPane(data, update) {
   const m = data.plans.monthly;
+  const now = new Date();
+  const monthKey = getMonthKey(now);
+  const auto = data.automation || {};
+  const isEmpty = !m.theme && (!m.top3 || m.top3.every(t => !t));
+
+  if (auto.autoMonthly !== false && (auto.lastMonthlyGenMonth !== monthKey) && isEmpty) {
+    const goals = data.annualGoals || [];
+    const month = now.getMonth() + 1;
+    const phaseGoals = goals.filter(g => {
+      const p = g.phase || 1;
+      if (month <= 4) return p === 1;
+      if (month <= 8) return p <= 2;
+      if (month <= 10) return p <= 3;
+      return true;
+    });
+    const p0 = phaseGoals.filter(g => g.priority === 'P0').map(g => g.name);
+    const p1 = phaseGoals.filter(g => g.priority === 'P1').map(g => g.name);
+    m.top3 = [p0[0] || p1[0] || '', p0[1] || p1[1] || '', p0[2] || p1[2] || ''].filter(Boolean);
+    const dims = ['A', 'B', 'C', 'D', 'E'];
+    dims.forEach((d, i) => {
+      const dimGoals = goals.filter(g => g.category === d);
+      if (m.goals && m.goals[i]) {
+        m.goals[i].target = dimGoals.map(g => g.name).join('、') || '';
+        m.goals[i].metric = dimGoals.map(g => `${g.name}${g.progress}%`).join('；') || '';
+      }
+    });
+    const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+    m.theme = `${monthNames[month - 1]}：${p0.concat(p1).slice(0, 3).join(' + ')} 重点突破`;
+    if (!m.calendarTasks) m.calendarTasks = [];
+    auto.lastMonthlyGenMonth = monthKey;
+  }
+
   const wrap = el('div');
   const card = el('div', 'card');
   const title = h('h3', '');
@@ -205,8 +250,157 @@ function monthlyPane(data, update) {
   return wrap;
 }
 
+function generateWeeklyFromMonthly(data) {
+  const m = data.plans.monthly;
+  const w = data.plans.weekly;
+  const goals = data.annualGoals || [];
+  const top3 = (m.top3 || []).filter(Boolean);
+
+  const matchedGoals = top3.map(t => goals.find(g => g.name === t || t.includes(g.name) || g.name.includes(t))).filter(Boolean);
+  const primaryGoals = matchedGoals.length ? matchedGoals : goals.filter(g => g.priority === 'P0').slice(0, 3);
+
+  w.theme = top3.length ? `本周：${top3.join(' + ')} 专项推进` : (m.theme || '本周：按月计划推进');
+
+  const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const sched = {};
+  dayNames.forEach(d => { sched[d] = { A: '', B: '', C: '', D: '', E: '' }; });
+
+  const goalA = goals.find(g => g.name === '会计考证');
+  const goalB = goals.find(g => g.name === '小红书运营');
+  const goalEng = goals.find(g => g.name === '英语雅思');
+  const goalFit = goals.find(g => g.name === '健身');
+  const goalSleep = goals.find(g => g.name === '规律作息');
+  const goalRead = goals.find(g => g.name === '读书');
+  const goalReview = goals.find(g => g.name === '日复盘');
+  const goalCall = goals.find(g => g.name === '练字');
+  const goalPod = goals.find(g => g.name === '播客');
+  const goalTakeout = goals.find(g => g.name === '尽量不点外卖');
+  const goalDy = goals.find(g => g.name === '抖音运营');
+
+  const isPrimaryA = primaryGoals.some(g => g.name === '会计考证');
+  const isPrimaryXhs = primaryGoals.some(g => g.name === '小红书运营');
+  const isPrimaryPod = primaryGoals.some(g => g.name === '播客');
+  const isPrimaryDy = primaryGoals.some(g => g.name === '抖音运营');
+  const isPrimaryEng = primaryGoals.some(g => g.name === '英语雅思');
+
+  if (isPrimaryA || goalA) {
+    sched['周一']['A'] = '会计：经济法基础 第一章精学';
+    sched['周二']['A'] = '会计：经济法基础 第一章习题';
+    sched['周三']['A'] = '会计：经济法基础 第二章';
+    sched['周四']['A'] = '会计：初级会计实务 第一章';
+    sched['周五']['A'] = '会计：错题回顾+章节测试';
+    sched['周六']['A'] = '会计：本周总结+薄弱点攻坚';
+  }
+
+  const bGoals = primaryGoals.filter(g => g.category === 'B');
+  if (bGoals.length === 0) {
+    if (goalB) bGoals.push(goalB);
+    else if (goalPod) bGoals.push(goalPod);
+    else if (goalDy) bGoals.push(goalDy);
+  }
+
+  const xhsTasksNew = ['账号搭建+主页装修', '选题库建立+拍摄第1篇', '修图+文案+发布第1篇', '数据复盘+评论区互动', '选题+拍摄第2篇', '发布第2篇+涨粉互动'];
+  const xhsTasks = ['选题+拍摄', '修图+文案', '发布+互动', '数据复盘', '选题+拍摄第2篇', '发布+涨粉'];
+  const podTasks = ['选题+大纲', '写稿+素材整理', '录制', '后期剪辑', '发布+宣传', '下期选题+复盘'];
+  const dyTasks = ['选题+脚本', '拍摄+剪辑', '发布+互动', '数据复盘', '拍摄第2条', '发布+涨粉'];
+
+  const getBTasks = (g) => {
+    if (g.name.includes('小红书')) {
+      return (g.currentStatus && g.currentStatus.includes('未开始')) ? xhsTasksNew : xhsTasks;
+    }
+    if (g.name.includes('播客')) return podTasks;
+    if (g.name.includes('抖音')) return dyTasks;
+    return xhsTasks;
+  };
+
+  const bDayMap = {
+    '周一': 0, '周二': 1, '周三': 2, '周四': 3, '周五': 4, '周六': 5
+  };
+
+  if (bGoals.length === 1) {
+    const g = bGoals[0];
+    const tasks = getBTasks(g);
+    Object.keys(bDayMap).forEach(day => {
+      sched[day]['B'] = `${g.name}：${tasks[bDayMap[day]]}`;
+    });
+  } else if (bGoals.length >= 2) {
+    const g1 = bGoals[0];
+    const g2 = bGoals[1];
+    const t1 = getBTasks(g1);
+    const t2 = getBTasks(g2);
+    sched['周一']['B'] = `${g1.name}：${t1[0]}`;
+    sched['周二']['B'] = `${g2.name}：${t2[0]}`;
+    sched['周三']['B'] = `${g1.name}：${t1[2]}`;
+    sched['周四']['B'] = `${g2.name}：${t2[2]}`;
+    sched['周五']['B'] = `${g1.name}：${t1[4]}`;
+    sched['周六']['B'] = `${g2.name}：${t2[5]}`;
+  }
+
+  if (isPrimaryEng || goalEng) {
+    const engTasks = isPrimaryEng
+      ? ['听力Part1精听', '阅读精读+词汇', '写作小作文', '口语Part1练习']
+      : ['听力30min', '阅读+词汇', '写作小作文', '听力+阅读'];
+    sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / ' + engTasks[0] : '雅思：' + engTasks[0];
+    sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / ' + engTasks[1] : '雅思：' + engTasks[1];
+    sched['周六']['A'] = sched['周六']['A'] ? sched['周六']['A'] + ' / ' + engTasks[2] : '雅思：' + engTasks[2];
+  }
+
+  dayNames.forEach((day, i) => {
+    const isWeekday = i < 5;
+    if (isWeekday) {
+      if (goalSleep) sched[day]['C'] = sched[day]['C'] || '7:00前起/23:00前睡';
+      if (goalFit && (i === 0 || i === 2 || i === 4)) {
+        sched[day]['C'] = (sched[day]['C'] ? sched[day]['C'] + ' + ' : '') + '健身：力量40min';
+      } else if (goalFit && (i === 1 || i === 3)) {
+        sched[day]['C'] = (sched[day]['C'] ? sched[day]['C'] + ' + ' : '') + '健身：有氧30min';
+      }
+      if (goalTakeout) sched[day]['C'] = sched[day]['C'] + ' / 不点外卖';
+    }
+    if (isWeekday && goalRead) {
+      sched[day]['D'] = sched[day]['D'] || '读书30min';
+    }
+    if (isWeekday && goalCall) {
+      sched[day]['D'] = (sched[day]['D'] ? sched[day]['D'] + ' + ' : '') + '练字15min';
+    }
+    if (isWeekday && goalReview) {
+      sched[day]['E'] = sched[day]['E'] || '日复盘（睡前10min）';
+    }
+  });
+
+  sched['周六']['D'] = sched['周六']['D'] || (goalRead ? '读书1小时' : '');
+  if (goalTakeout) sched['周六']['C'] = (sched['周六']['C'] ? sched['周六']['C'] + ' + ' : '') + '外卖控制';
+  sched['周日']['E'] = '周复盘+下周计划+休整';
+
+  if (w.schedule) {
+    Object.keys(sched).forEach(day => {
+      if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
+      Object.keys(sched[day]).forEach(dim => {
+        w.schedule[day][dim] = sched[day][dim];
+      });
+    });
+  }
+
+  if (w.mustDo) {
+    w.mustDo = [
+      top3[0] || (primaryGoals[0]?.name || ''),
+      top3[1] || (primaryGoals[1]?.name || ''),
+      top3[2] || (primaryGoals[2]?.name || '')
+    ];
+  }
+}
+
 function weeklyPane(data, update) {
   const w = data.plans.weekly;
+  const now = new Date();
+  const weekKey = getWeekKey(now);
+  const auto = data.automation || {};
+  const isEmpty = !w.theme && (!w.schedule || Object.values(w.schedule).every(d => Object.values(d).every(v => !v)));
+
+  if (auto.autoWeekly !== false && (auto.lastWeeklyGenWeek !== weekKey) && isEmpty) {
+    generateWeeklyFromMonthly(data);
+    auto.lastWeeklyGenWeek = weekKey;
+  }
+
   const wrap = el('div');
   const card = el('div', 'card');
   const title = h('h3', '');
@@ -214,141 +408,7 @@ function weeklyPane(data, update) {
 
   const genBtn = el('button', 'btn-quick', '从月计划生成');
   genBtn.addEventListener('click', () => {
-    const m = data.plans.monthly;
-    const goals = data.annualGoals || [];
-    const top3 = (m.top3 || []).filter(Boolean);
-
-    const matchedGoals = top3.map(t => goals.find(g => g.name === t || t.includes(g.name) || g.name.includes(t))).filter(Boolean);
-    const primaryGoals = matchedGoals.length ? matchedGoals : goals.filter(g => g.priority === 'P0').slice(0, 3);
-
-    w.theme = top3.length ? `本周：${top3.join(' + ')} 专项推进` : (m.theme || '本周：按月计划推进');
-
-    const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const sched = {};
-    dayNames.forEach(d => { sched[d] = { A: '', B: '', C: '', D: '', E: '' }; });
-
-    const goalA = goals.find(g => g.name === '会计考证');
-    const goalB = goals.find(g => g.name === '小红书运营');
-    const goalEng = goals.find(g => g.name === '英语雅思');
-    const goalFit = goals.find(g => g.name === '健身');
-    const goalSleep = goals.find(g => g.name === '规律作息');
-    const goalRead = goals.find(g => g.name === '读书');
-    const goalReview = goals.find(g => g.name === '日复盘');
-    const goalCall = goals.find(g => g.name === '练字');
-    const goalPod = goals.find(g => g.name === '播客');
-    const goalTakeout = goals.find(g => g.name === '尽量不点外卖');
-    const goalDy = goals.find(g => g.name === '抖音运营');
-
-    const isPrimaryA = primaryGoals.some(g => g.name === '会计考证');
-    const isPrimaryXhs = primaryGoals.some(g => g.name === '小红书运营');
-    const isPrimaryPod = primaryGoals.some(g => g.name === '播客');
-    const isPrimaryDy = primaryGoals.some(g => g.name === '抖音运营');
-    const isPrimaryEng = primaryGoals.some(g => g.name === '英语雅思');
-
-    if (isPrimaryA || goalA) {
-      sched['周一']['A'] = '会计：经济法基础 第一章精学';
-      sched['周二']['A'] = '会计：经济法基础 第一章习题';
-      sched['周三']['A'] = '会计：经济法基础 第二章';
-      sched['周四']['A'] = '会计：初级会计实务 第一章';
-      sched['周五']['A'] = '会计：错题回顾+章节测试';
-      sched['周六']['A'] = '会计：本周总结+薄弱点攻坚';
-    }
-
-    const bGoals = primaryGoals.filter(g => g.category === 'B');
-    if (bGoals.length === 0) {
-      if (goalB) bGoals.push(goalB);
-      else if (goalPod) bGoals.push(goalPod);
-      else if (goalDy) bGoals.push(goalDy);
-    }
-
-    const xhsTasksNew = ['账号搭建+主页装修', '选题库建立+拍摄第1篇', '修图+文案+发布第1篇', '数据复盘+评论区互动', '选题+拍摄第2篇', '发布第2篇+涨粉互动'];
-    const xhsTasks = ['选题+拍摄', '修图+文案', '发布+互动', '数据复盘', '选题+拍摄第2篇', '发布+涨粉'];
-    const podTasks = ['选题+大纲', '写稿+素材整理', '录制', '后期剪辑', '发布+宣传', '下期选题+复盘'];
-    const dyTasks = ['选题+脚本', '拍摄+剪辑', '发布+互动', '数据复盘', '拍摄第2条', '发布+涨粉'];
-
-    const getBTasks = (g) => {
-      if (g.name.includes('小红书')) {
-        return (g.currentStatus && g.currentStatus.includes('未开始')) ? xhsTasksNew : xhsTasks;
-      }
-      if (g.name.includes('播客')) return podTasks;
-      if (g.name.includes('抖音')) return dyTasks;
-      return xhsTasks;
-    };
-
-    const bDayMap = {
-      '周一': 0, '周二': 1, '周三': 2, '周四': 3, '周五': 4, '周六': 5
-    };
-
-    if (bGoals.length === 1) {
-      const g = bGoals[0];
-      const tasks = getBTasks(g);
-      Object.keys(bDayMap).forEach(day => {
-        sched[day]['B'] = `${g.name}：${tasks[bDayMap[day]]}`;
-      });
-    } else if (bGoals.length >= 2) {
-      const g1 = bGoals[0];
-      const g2 = bGoals[1];
-      const t1 = getBTasks(g1);
-      const t2 = getBTasks(g2);
-      sched['周一']['B'] = `${g1.name}：${t1[0]}`;
-      sched['周二']['B'] = `${g2.name}：${t2[0]}`;
-      sched['周三']['B'] = `${g1.name}：${t1[2]}`;
-      sched['周四']['B'] = `${g2.name}：${t2[2]}`;
-      sched['周五']['B'] = `${g1.name}：${t1[4]}`;
-      sched['周六']['B'] = `${g2.name}：${t2[5]}`;
-    }
-
-    if (isPrimaryEng || goalEng) {
-      const engTasks = isPrimaryEng
-        ? ['听力Part1精听', '阅读精读+词汇', '写作小作文', '口语Part1练习']
-        : ['听力30min', '阅读+词汇', '写作小作文', '听力+阅读'];
-      sched['周二']['A'] = sched['周二']['A'] ? sched['周二']['A'] + ' / ' + engTasks[0] : '雅思：' + engTasks[0];
-      sched['周四']['A'] = sched['周四']['A'] ? sched['周四']['A'] + ' / ' + engTasks[1] : '雅思：' + engTasks[1];
-      sched['周六']['A'] = sched['周六']['A'] ? sched['周六']['A'] + ' / ' + engTasks[2] : '雅思：' + engTasks[2];
-    }
-
-    dayNames.forEach((day, i) => {
-      const isWeekday = i < 5;
-      if (isWeekday) {
-        if (goalSleep) sched[day]['C'] = sched[day]['C'] || '7:00前起/23:00前睡';
-        if (goalFit && (i === 0 || i === 2 || i === 4)) {
-          sched[day]['C'] = (sched[day]['C'] ? sched[day]['C'] + ' + ' : '') + '健身：力量40min';
-        } else if (goalFit && (i === 1 || i === 3)) {
-          sched[day]['C'] = (sched[day]['C'] ? sched[day]['C'] + ' + ' : '') + '健身：有氧30min';
-        }
-        if (goalTakeout) sched[day]['C'] = sched[day]['C'] + ' / 不点外卖';
-      }
-      if (isWeekday && goalRead) {
-        sched[day]['D'] = sched[day]['D'] || '读书30min';
-      }
-      if (isWeekday && goalCall) {
-        sched[day]['D'] = (sched[day]['D'] ? sched[day]['D'] + ' + ' : '') + '练字15min';
-      }
-      if (isWeekday && goalReview) {
-        sched[day]['E'] = sched[day]['E'] || '日复盘（睡前10min）';
-      }
-    });
-
-    sched['周六']['D'] = sched['周六']['D'] || (goalRead ? '读书1小时' : '');
-    if (goalTakeout) sched['周六']['C'] = (sched['周六']['C'] ? sched['周六']['C'] + ' + ' : '') + '外卖控制';
-    sched['周日']['E'] = '周复盘+下周计划+休整';
-
-    if (w.schedule) {
-      Object.keys(sched).forEach(day => {
-        if (!w.schedule[day]) w.schedule[day] = { A: '', B: '', C: '', D: '', E: '' };
-        Object.keys(sched[day]).forEach(dim => {
-          w.schedule[day][dim] = sched[day][dim];
-        });
-      });
-    }
-
-    if (w.mustDo) {
-      w.mustDo = [
-        top3[0] || (primaryGoals[0]?.name || ''),
-        top3[1] || (primaryGoals[1]?.name || ''),
-        top3[2] || (primaryGoals[2]?.name || '')
-      ];
-    }
+    generateWeeklyFromMonthly(data);
     toast('周计划已从月计划Top3+年度目标智能生成', 'success');
     update();
   });
