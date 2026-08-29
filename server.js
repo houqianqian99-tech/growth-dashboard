@@ -314,6 +314,103 @@ const server = createServer(async (req, res) => {
 
 const HABIT_LIST = ['22:30前入睡','6:30起床','健身/运动30min','不点外卖','英语学习1h','会计备考2h+','读书30min','小红书/抖音内容产出','练字20min','日复盘完成','自己做饭'];
 
+const QUOTES = [
+  '日拱一卒，功不唐捐',
+  '今日事今日毕',
+  '种一棵树最好的时间是十年前，其次是现在',
+  '不积跬步无以至千里',
+  '自律给我自由',
+  '每天进步一点点',
+  '行动是治愈焦虑的良药',
+  '把简单的事做到极致',
+  '光想不做，一切都是零',
+  '复盘是为了更好地前进',
+  '坚持比天赋更重要',
+  '完成比完美更重要',
+  '小步快跑，迭代优化',
+  '今天的努力是明天的底气',
+  '可控的事尽力，不可控的事释然',
+  '与其焦虑不如行动',
+  '习惯成自然，自然成命运',
+  '每天前进一小步，人生前进一大步',
+  '把时间花在进步上，而不是焦虑上',
+  '今天的你比昨天的你更好就够了',
+  '做难事必有所得',
+  '执行力是拉开差距的关键',
+  '先完成再完美',
+  '慢慢来，比较快',
+  '保持节奏感比冲刺更重要',
+  '一个人走得快，一群人走得远',
+  '可以慢但不能停',
+  '方向对了就不怕路远',
+  '把每一天当作第一天来过',
+  '持续做正确的事，时间会给你答案'
+];
+
+function getDayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+
+function buildMorningMessage(data) {
+  const now = new Date();
+  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const dayOfWeek = now.getDay();
+  const dayName = dayNames[dayOfWeek];
+  const month = now.getMonth() + 1;
+  const date = now.getDate();
+  const quote = QUOTES[getDayOfYear(now) % QUOTES.length];
+  const weekdayKey = dayName;
+
+  const weekly = data?.plans?.weekly;
+  const daily = data?.plans?.daily || [];
+  const todos = daily.filter(t => !t.done);
+
+  let daySchedule = '';
+  if (weekly?.schedule && weekly.schedule[weekdayKey]) {
+    const s = weekly.schedule[weekdayKey];
+    const dims = [
+      { key: 'A', label: '💼 硬技能' },
+      { key: 'B', label: '🎨 运营' },
+      { key: 'C', label: '💪 健康' },
+      { key: 'D', label: '📖 素养' },
+      { key: 'E', label: '🔄 系统' }
+    ];
+    const items = [];
+    dims.forEach(dim => {
+      if (s[dim.key] && s[dim.key].trim()) {
+        items.push(`${dim.label}：${s[dim.key]}`);
+      }
+    });
+    if (items.length > 0) daySchedule = items.join('\n');
+  }
+
+  let msg = `☀️ 早上好！${month}月${date}日 ${dayName}\n\n${quote}\n\n`;
+  msg += '📅 今日安排：\n';
+  if (daySchedule) {
+    msg += daySchedule + '\n';
+  } else {
+    msg += '（打开工作台安排今天的任务吧）\n';
+  }
+
+  if (todos.length > 0) {
+    msg += '\n✅ 今日待办：\n';
+    todos.slice(0, 6).forEach((t, i) => {
+      msg += `   ${i + 1}. ${t.text}\n`;
+    });
+    if (todos.length > 6) msg += `   ...还有 ${todos.length - 6} 项\n`;
+  }
+
+  if (weekly?.mustDo && weekly.mustDo.filter(Boolean).length > 0) {
+    msg += '\n🎯 本周 Must-Do：\n';
+    weekly.mustDo.filter(Boolean).forEach((t, i) => {
+      msg += `   ${i + 1}. ${t}\n`;
+    });
+  }
+
+  return msg;
+}
+
 async function checkServerReminders() {
   if (!feishuConfig.appId || !feishuConfig.appSecret || !feishuConfig.botOpenId) return;
 
@@ -327,55 +424,68 @@ async function checkServerReminders() {
   const today = now.toISOString().split('T')[0];
   const day = now.getDay();
 
+  if (currentTime >= '07:00' && currentTime < '07:30' && data.automation.autoDaily) {
+    const key = 'morning_' + today;
+    if (!_serverShownReminders[key]) {
+      _serverShownReminders[key] = true;
+      const text = buildMorningMessage(data);
+      await sendFeishuMessage(feishuConfig.botOpenId, text);
+    }
+  }
+
+  if (currentTime >= '09:00' && currentTime < '09:30' && day >= 1 && day <= 5) {
+    const key = 'accounting_' + today;
+    if (!_serverShownReminders[key]) {
+      _serverShownReminders[key] = true;
+      await sendFeishuMessage(feishuConfig.botOpenId, '💼 会计备考时间到\n番茄钟：45min学习 + 10min休息\n今天也是进步的一天，加油！');
+    }
+  }
+
   const hasDailyReview = data.review && data.review.daily &&
     data.review.daily.some(r => r.date === today && r.answers && r.answers.some(a => a && a.trim()));
 
-  if (currentTime >= '20:00' && currentTime < '22:30' && !hasDailyReview && data.automation.autoReview) {
-    const key = 'daily_' + today;
-    if (!_serverShownReminders[key]) {
-      _serverShownReminders[key] = true;
-      await sendFeishuMessage(feishuConfig.botOpenId, '该写日复盘了\n点击复盘中心，用 5 个问题回顾今天\n发送「待办」查看今日完成情况');
-    }
-  }
-
-  if (currentTime >= '22:00' && currentTime < '23:59') {
-    let unchecked = 0;
-    HABIT_LIST.forEach(name => {
-      const hd = data.habitData && data.habitData[name];
-      if (!hd || !hd[today]) unchecked++;
-    });
-    if (unchecked > 0) {
-      const key = 'habit_' + today;
+  if (currentTime >= '20:00' && currentTime < '20:30' && !hasDailyReview && data.automation.autoReview) {
+    if (day === 0) {
+      const key = 'weekly_' + today;
       if (!_serverShownReminders[key]) {
         _serverShownReminders[key] = true;
-        await sendFeishuMessage(feishuConfig.botOpenId, `习惯打卡提醒\n还有 ${unchecked} 项习惯未打卡，快去完成吧\n发送「打卡」查看未打卡列表`);
+        await sendFeishuMessage(feishuConfig.botOpenId, '📝 该写周复盘了\n\n6 个问题帮你总结一周：\n1. 本周目标完成率多少？\n2. 哪个维度进展最好？哪个最差？\n3. 本周最大收获是什么？\n4. 时间花在哪里了？和计划偏差大吗？\n5. 下周需要调整什么？\n6. 下周的3个must-do是什么？\n\n打开工作台 → 复盘中心 开始写');
+      }
+    } else {
+      const key = 'daily_' + today;
+      if (!_serverShownReminders[key]) {
+        _serverShownReminders[key] = true;
+        await sendFeishuMessage(feishuConfig.botOpenId, '📝 该写日复盘了\n\n5 个问题回顾今天：\n1. 今天完成了哪些任务？\n2. 哪3件事做得好？为什么好？\n3. 哪件事没做完/没做好？卡在哪里？\n4. 明天最重要的一件事是什么？\n5. 今天有什么收获或感恩？\n\n打开工作台 → 复盘中心 开始写');
+      }
+    }
+
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    if (now.getDate() === lastDay) {
+      const mKey = now.toISOString().slice(0, 7);
+      const key = 'monthly_' + mKey;
+      if (!_serverShownReminders[key]) {
+        _serverShownReminders[key] = true;
+        await sendFeishuMessage(feishuConfig.botOpenId, '📊 今天也是月复盘日\n\n5 个问题总结本月：\n1. 月度目标完成率多少？哪些达标？\n2. 关键指标追踪（粉丝/读书/健身/复盘）\n3. 本月最满意/最遗憾的一件事？\n4. 下月需要新增/减少/调整哪些目标？\n5. 填好下月的月计划\n\n打开工作台 → 复盘中心 → 月复盘');
       }
     }
   }
 
-  if (day === 0 && currentTime >= '20:00' && currentTime < '22:30') {
-    const ws = new Date(now);
-    const diff = ws.getDate() - ws.getDay() + (ws.getDay() === 0 ? -6 : 1);
-    ws.setDate(diff);
-    const weekStart = ws.toISOString().split('T')[0];
-    const hasWeeklyReview = data.review && data.review.weekly &&
-      data.review.weekly.some(r => r.weekStart === weekStart && r.answers && r.answers.some(a => a && a.trim()));
-    if (!hasWeeklyReview) {
-      const key = 'weekly_' + weekStart;
-      if (!_serverShownReminders[key]) {
-        _serverShownReminders[key] = true;
-        await sendFeishuMessage(feishuConfig.botOpenId, '该写周复盘了\n周日是总结一周的好时机，6 个问题帮你复盘');
-      }
-    }
-  }
-
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  if (now.getDate() === lastDay && currentTime >= '20:00' && currentTime < '22:30') {
-    const mKey = now.toISOString().slice(0, 7);
-    const key = 'monthly_' + mKey;
+  if (currentTime >= '22:00' && currentTime < '22:30') {
+    const habits = data.habits || [];
+    const habitData = data.habitData || {};
+    const unchecked = habits.filter(h => !habitData[h.name] || !habitData[h.name][today]);
+    const key = 'habit_' + today;
     if (!_serverShownReminders[key]) {
       _serverShownReminders[key] = true;
-      await sendFeishuMessage(feishuConfig.botOpenId, '该写月复盘了\n月末总结，规划下月目标');
+      let text = '🌙 睡前打卡提醒\n\n';
+      if (unchecked.length > 0) {
+        text += `还有 ${unchecked.length} 项习惯未打卡：\n`;
+        unchecked.slice(0, 8).forEach(h => { text += `   ⬜ ${h.name}\n`; });
+      } else {
+        text += '🎉 今天所有习惯都已打卡！\n';
+      }
+      text += '\n打开工作台完成打卡，早点休息～';
+      await sendFeishuMessage(feishuConfig.botOpenId, text);
     }
   }
 }
